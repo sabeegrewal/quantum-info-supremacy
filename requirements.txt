@@ -1,0 +1,4 @@
+pytest 
+quimb 
+matplotlib 
+jax
