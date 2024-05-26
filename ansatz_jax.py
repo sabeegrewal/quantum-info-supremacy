@@ -235,3 +235,59 @@ def ansatz_state(params, num_qubits, depth):
         off += 6*num_2_per_layer
     
     return state
+
+def ansatz_circ_quimb(params, num_qubits, depth):
+    """Compute the 1D ansatz circuit with given parameters, using quimb.
+    This is for a 1D cyclic brickwork architecture with alternating U3 and RZZ gates.
+    The circuit is initialized to the all zero state.
+    Useful as a sanity check for `ansatz_state`.
+
+    Parameters
+    ----------
+    params : jax array
+        Parameters of the gates. Should have length `num_ansatz_params(num_qubits, depth)`.
+    num_qubits : int
+        Number of qubits in the circuit and its output state.
+    depth : int
+        Depth of the ansatz circuit, as measured by number of two-qubit layers.
+
+    Returns
+    -------
+    quimb Circuit
+        The parametrized ansatz circuit.
+    """
+    import quimb as qu
+    import quimb.tensor as qtn
+    circ = qtn.Circuit(num_qubits)
+
+    # Current offset into the parameter array
+    off = 0
+
+    # Start with a one-qubit layer on all qubits
+    for i in range(num_qubits):
+        theta, phi, lamda = params[off:off+3]
+        off += 3
+        circ.apply_gate("U3", theta, phi, lamda, i,
+                        gate_round=0, parametrize=True)
+    
+    for layer in range(depth):
+        # First identify the paired qubits
+        pairs = brickwork_pairs(num_qubits, layer)
+        
+        # Apply an RZZ layer
+        for i, j in pairs:
+            theta = params[off]
+            off += 1
+            circ.apply_gate("RZZ", theta, i, j,
+                            gate_round=layer, parametrize=True)
+
+        # Apply a U3 layer, but only to the qubits that were paired
+        indices = list(sum(pairs, ())) # This flattens the list of paired indices
+        for i in indices:
+            theta, phi, lamda = params[off:off+3]
+            off += 3
+            circ.apply_gate("U3", theta, phi, lamda, i,
+                            gate_round=layer+1, parametrize=True)
+
+    return circ
+
