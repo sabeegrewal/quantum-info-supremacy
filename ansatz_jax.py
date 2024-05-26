@@ -60,48 +60,97 @@ def rzz(theta):
     # See https://docs.quantum.ibm.com/api/qiskit/qiskit.circuit.library.RZZGate
     return jnp.diag(jnp.array([eit2, eit2c, eit2c, eit2]))
 
-def one_qubit_layer(one_qubit_params, state, num_qubits):
+def apply_u3(state, i, theta, phi, lamda):
+    """Apply a single U3 gate.
+
+    Parameters
+    ----------
+    state : jax array
+        Should have shape `[2] * n` for some `n > i`.
+    i : int
+        Index at which to apply the gate.
+    theta : real
+    phi  : real
+    lamda : real
+
+    Returns
+    -------
+    jax array
+        The state with the U3(theta, phi, lamda) gate applied at index i.
+    """
+    
+    U = u3(theta, phi, lamda)
+    # This will roll the index i to the end
+    state = jnp.tensordot(state, U, axes=([i], [1]))
+    # Now we need to roll the last index back to i
+    state = jnp.rollaxis(state, -1, i)
+    return state
+
+def apply_rzz(state, i, j, theta):
+    """Apply a single RZZ gate.
+
+    Parameters
+    ----------
+    state : jax array
+        Should have shape `[2] * n` for some `n > j`.
+    i : int
+        First index at which to apply the gate.`
+    j : int
+        Second index at which to apply the gate.
+    theta : real
+
+    Returns
+    -------
+    jax array
+        The state with the RZZ(theta) gate applied at indices (i, j).
+    """
+    
+    U = rzz(theta).reshape([2, 2, 2, 2])
+    # Set i to the smaller and j to the larger index,
+    # so that index rolling works as intended
+    i, j = sorted((i, j))
+    # This will roll the indices i, j to the end
+    state = jnp.tensordot(state, U, axes=([i, j], [2, 3]))
+    # Now we need to roll the last two indices back to i, j
+    state = jnp.rollaxis(state, -2, i)
+    state = jnp.rollaxis(state, -1, j)
+    return state
+
+def one_qubit_layer(one_qubit_params, state, indices):
     """Apply a layer of U3 gates.
 
     Parameters
     ----------
     one_qubit_params : jax array
-        Parameters of the gates. Should have length `3*num_qubits`.
+        Parameters of the gates. Should have length `3*len(indices)`.
     state : jax array
-        Should have shape `[2] * num_qubits`.
-    num_qubits : int
-        Number of qubits in the state.
+        Should have shape `[2] * n` for some `n > max(indices)`.
+    indices : list[int]
+        Indices at which to apply gates.
 
     Returns
     -------
     jax array
         The state with the corresponding U3 gates applied.
     """
-    
-    for i in range(num_qubits):
-        theta, phi, lamda = one_qubit_params[3*i:3*i+3]
-        U = u3(theta, phi, lamda)
-        # Notice: we always apply U to the first index of the tensor.
-        # This works because tensordot sends the resulting indices
-        # to the back. So, at the end of the loop, we will have applied
-        # one gate to each index, and the indices will be in their
-        # original order again.
-        state = jnp.tensordot(state, U, axes=([0], [1]))
+
+    for idx in range(len(indices)):
+        theta, phi, lamda = one_qubit_params[3*idx:3*idx+3]
+        i = indices[idx]
+        state = apply_u3(state, i, theta, phi, lamda)
     return state
 
-def two_qubit_layer(two_qubit_params, state, num_qubits, evenodd):
-    """Apply a layer of RZZ gates in a 1D brickwork fashion.
+def two_qubit_layer(two_qubit_params, state, indices):
+    """Apply a layer of RZZ gates.
 
     Parameters
     ----------
     two_qubit_params : jax array
-        Parameters of the gates. Should have length `(num_qubits - evenodd) // 2`.
+        Parameters of the gates. Should have length `len(indices)`.
     state : jax array
-        Should have shape `[2] * num_qubits`.
-    num_qubits : int
-        Number of qubits in the state.
-    evenodd : int
-        0 of the layer is at even depth, 1 if the layer is at odd depth.
+        Should have shape `[2] * n` for some `n > max(max(pair) for pair in indices)`.
+    indices : list[(int, int)]
+        Pairs of indices at which to apply gates.
 
     Returns
     -------
@@ -109,34 +158,33 @@ def two_qubit_layer(two_qubit_params, state, num_qubits, evenodd):
         The state with the corresponding RZZ gates applied.
     """
 
-    # When n is even and the layer is even, we apply n/2 gates
-    # When n is even and the layer is odd, we apply (n/2)-1 gates
-    # When n is odd, we apply (n-1)/2 gates
-    # The formula below evaluates this succinctly
-    for i in range((num_qubits - evenodd) // 2):
-        theta = two_qubit_params[i]
-        # Reshape into the appropriate tensor
-        U = rzz(theta).reshape([2, 2, 2, 2])
-        # In an even layer, apply gates starting at the first index
-        # In an odd layer, apply gates starting at the second index
-        # Like in the 1-qubit case, this works because of the way
-        # tensordot moves indices
-        state = jnp.tensordot(state, U, axes=([0+evenodd, 1+evenodd], [2, 3]))
-    # Now, if the last qubit did not have a gate applied, it lies in the wrong
-    # position. There are two possible cases here
-    if evenodd == 0 and num_qubits % 2 == 1:
-        # Move the last qubit, which is now at the front, to the back
-        # TODO try doing this by actually reordering indices,
-        # instead of this easier hack...
-        state = jnp.tensordot(state, identity(1), axes=([0], [1]))
-    if evenodd == 1 and num_qubits % 2 == 0:
-        # Move the last qubit, which is now one after the front, to the back
-        state = jnp.tensordot(state, identity(1), axes=([1], [1]))
+    for idx in range(len(indices)):
+        theta = two_qubit_params[idx]
+        i, j = indices[idx]
+        state = apply_rzz(state, i, j, theta)
     return state
 
+def brickwork_pairs(num_qubits, layer):
+    """Which qubits to pair in a 1D cyclic brickwork circuit.
+
+    Parameters
+    ----------
+    num_qubits : int
+        Number of qubits in the circuit.
+    layer : int
+        Layer at which gates are being applied.
+
+    Returns
+    -------
+    list[(int, int)]
+        The list of qubits paired at this layer.
+    """
+    return [((layer+i) % num_qubits, (layer+i+1) % num_qubits) for i in range(0, num_qubits-1, 2)]
+        
+
 def num_ansatz_params(num_qubits, depth):
-    """Numper of continuous parameters in an ansatz circuit.
-    This is for a 1D brickwork architecture with alternating U3 and RZZ gates.
+    """Numper of continuous parameters in an ansatz circuit. This is for a
+    1D cyclic brickwork architecture with alternating U3 and RZZ gates.
 
     Parameters
     ----------
@@ -147,24 +195,18 @@ def num_ansatz_params(num_qubits, depth):
 
     Returns
     -------
-    jax array
-        The state with the corresponding U3 gates applied.
+    int
+        The number of parameters needed to build such an ansatz circuit.
     """
-
-    # Number of one-qubit gates
-    # Add one to the depth because we do these before/after each two-qubit layer
-    num_1 = num_qubits * 3 * (depth + 1)
-    if num_qubits % 2 == 0:
-        # Alternate between n/2 and (n/2) - 1 qubits
-        num_2 = (num_qubits // 2) * depth - (depth // 2)
-    else:
-        # Always (n-1)/2 qubits
-        num_2 = (num_qubits // 2) * depth
-    return num_1 + num_2
+    
+    num_2_per_layer = num_qubits // 2
+    num_1 = num_qubits + 2 * num_2_per_layer * depth
+    num_2 = num_2_per_layer * depth
+    return num_2 + 3 * num_1
 
 def ansatz_state(params, num_qubits, depth):
     """Compute the output state of a 1D ansatz circuit with given parameters.
-    This is for a 1D brickwork architecture with alternating U3 and RZZ gates.
+    This is for a1D cyclic brickwork architecture with alternating U3 and RZZ gates.
     The circuit is initialized to the all zero state.
 
     Parameters
@@ -189,19 +231,24 @@ def ansatz_state(params, num_qubits, depth):
 
     # Current offset into the parameter array
     off = 0
+
+    # Start with a one-qubit layer on all qubits
+    state = one_qubit_layer(params[off:off+3*num_qubits], state, range(num_qubits))
+    off += 3*num_qubits
+
+    num_2_per_layer = num_qubits // 2
     for layer in range(depth):
-        # Apply a U3 layer
-        state = one_qubit_layer(params[off:off+3*num_qubits], state, num_qubits)
-        off += 3*num_qubits
-
+        # First identify the paired qubits
+        pairs = brickwork_pairs(num_qubits, layer)
+        
         # Apply an RZZ layer
-        num_two_qubit = (num_qubits - layer % 2) // 2
-        state = two_qubit_layer(params[off:off+num_two_qubit], state, num_qubits, layer % 2)
-        off += num_two_qubit
+        state = two_qubit_layer(params[off:off+num_2_per_layer], state, pairs)
+        off += num_2_per_layer
 
-    # One more one-qubit layer
-    state = one_qubit_layer(params[off:off+3*num_qubits], state, num_qubits)
-    # off += 3*num_qubits
+        # Apply a U3 layer, but only to the qubits that were paired
+        indices = list(sum(pairs, ())) # This flattens the list of paired indices
+        state = one_qubit_layer(params[off:off+6*num_2_per_layer], state, indices)
+        off += 3*num_qubits
     
     return state
 
