@@ -45,9 +45,7 @@ def random_matching(N):
 
 
 def brickwork(N, s):
-    pairs = [((s + i) % N, (s + i + 1) % N) for i in range(0, N, 2)]
-    if N % 2 != 0:
-        pairs.pop()
+    pairs = [((s + i) % N, (s + i + 1) % N) for i in range(0, N - 1, 2)]
     return pairs
 
 
