@@ -1,22 +1,6 @@
 import jax
 import jax.numpy as jnp
 
-def identity(num_qubits):
-    """The identity on a specified number of qubits.
-
-    Parameters
-    ----------
-    num_qubits : int
-        The number of qubits.
-
-    Returns
-    -------
-    jax array
-        The identity matrix of dimension `2**num_qubits`  as a 2D jax array.
-    """
-    
-    return jnp.identity(2**num_qubits)
-
 def u3(theta, phi, lamda):
     """Arbitrary one-qubit gate with three real parameters.
 
@@ -250,69 +234,4 @@ def ansatz_state(params, num_qubits, depth):
         state = one_qubit_layer(params[off:off+6*num_2_per_layer], state, indices)
         off += 3*num_qubits
     
-    return state
-
-def ansatz_state_inefficient(params, num_qubits, depth):
-    """Compute the output state of a 1D ansatz circuit with given parameters.
-    This is for a 1D brickwork architecture with alternating U3 and RZZ gates.
-    The circuit is initialized to the all zero state.
-    The output should be the same as `ansatz_state`, but this implementation
-    may be less efficient. Useful as a sanity check.
-
-    Parameters
-    ----------
-    params : jax array
-        Parameters of the gates. Should have length `num_ansatz_params(num_qubits, depth)`.
-    num_qubits : int
-        Number of qubits in the circuit and its output state.
-    depth : int
-        Depth of the ansatz circuit, as measured by number of two-qubit layers.
-
-    Returns
-    -------
-    jax array
-        The state with the corresponding U3 gates applied.
-    """
-
-    # Initialize the all-zero state
-    state = jnp.zeros(2**num_qubits)
-    state = state.at[0].set(1)
-
-    # Current offset into the parameter array
-    off = 0
-    for layer in range(depth):
-        # Apply a U3 layer
-        one_qubit_Us = 1
-        for i in range(num_qubits):
-            theta, phi, lamda = params[off:off+3]
-            off += 3
-            U = u3(theta, phi, lamda)
-            one_qubit_Us = jnp.kron(one_qubit_Us, U)
-        state = one_qubit_Us @ state
-
-        # Apply an RZZ layer
-        # Apply identity on the first qubit, if necessary
-        if layer % 2 == 0:
-            two_qubit_Us = 1
-        else:
-            two_qubit_Us = identity(1)
-        for i in range((num_qubits - layer % 2) // 2):
-            theta = params[off]
-            off += 1
-            U = rzz(theta)
-            two_qubit_Us = jnp.kron(two_qubit_Us, U)
-        # Apply identity on the last qubit, if necessary
-        if (layer + num_qubits) % 2 == 1:
-            two_qubit_Us = jnp.kron(two_qubit_Us, identity(1))
-        state = two_qubit_Us @ state
-
-    # One more one-qubit layer
-    one_qubit_Us = 1
-    for i in range(num_qubits):
-        theta, phi, lamda = params[off:off+3]
-        U = u3(theta, phi, lamda)
-        one_qubit_Us = jnp.kron(one_qubit_Us, U)
-        off += 3
-    state = one_qubit_Us @ state
-
     return state
