@@ -205,7 +205,7 @@ def ansatz_state(params, num_qubits, depth):
     Returns
     -------
     jax array
-        The state with the corresponding U3 gates applied.
+        The state with the parametrized ansatz circuit applied.
     """
 
     # Initialize the all-zero state
@@ -232,6 +232,6 @@ def ansatz_state(params, num_qubits, depth):
         # Apply a U3 layer, but only to the qubits that were paired
         indices = list(sum(pairs, ())) # This flattens the list of paired indices
         state = one_qubit_layer(params[off:off+6*num_2_per_layer], state, indices)
-        off += 3*num_qubits
+        off += 6*num_2_per_layer
     
     return state
