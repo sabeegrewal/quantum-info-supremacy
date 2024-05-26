@@ -190,7 +190,7 @@ def num_ansatz_params(num_qubits, depth):
 
 def ansatz_state(params, num_qubits, depth):
     """Compute the output state of a 1D ansatz circuit with given parameters.
-    This is for a1D cyclic brickwork architecture with alternating U3 and RZZ gates.
+    This is for a 1D cyclic brickwork architecture with alternating U3 and RZZ gates.
     The circuit is initialized to the all zero state.
 
     Parameters
@@ -205,7 +205,7 @@ def ansatz_state(params, num_qubits, depth):
     Returns
     -------
     jax array
-        The state with the parametrized ansatz circuit applied.
+        The state with the parametrized ansatz circuit applied, as an array of shape `[2] * num_qubits`.
     """
 
     # Initialize the all-zero state
