@@ -213,26 +213,27 @@ def ansatz_state(params, num_qubits, depth):
     state = state.at[0].set(1)
     state = state.reshape([2] * num_qubits)
 
-    # Current offset into the parameter array
-    off = 0
+    num_2_per_layer = num_qubits // 2
+    num_2 = num_2_per_layer * depth
+    # Split the parameter array into the RZZ and U3 parameters
+    rzz_params = params[:num_2]
+    u3_params = params[num_2:]
 
     # Start with a one-qubit layer on all qubits
-    state = one_qubit_layer(params[off:off+3*num_qubits], state, range(num_qubits))
-    off += 3*num_qubits
+    state = one_qubit_layer(u3_params[:3*num_qubits], state, range(num_qubits))
 
-    num_2_per_layer = num_qubits // 2
     for layer in range(depth):
         # First identify the paired qubits
         pairs = brickwork_pairs(num_qubits, layer)
         
         # Apply an RZZ layer
-        state = two_qubit_layer(params[off:off+num_2_per_layer], state, pairs)
-        off += num_2_per_layer
+        rzz_off = layer*num_2_per_layer
+        state = two_qubit_layer(rzz_params[rzz_off:rzz_off+num_2_per_layer], state, pairs)
 
         # Apply a U3 layer, but only to the qubits that were paired
         indices = list(sum(pairs, ())) # This flattens the list of paired indices
-        state = one_qubit_layer(params[off:off+6*num_2_per_layer], state, indices)
-        off += 6*num_2_per_layer
+        u3_off = (3*num_qubits) + (6*layer*num_2_per_layer)
+        state = one_qubit_layer(u3_params[u3_off:u3_off+6*num_2_per_layer], state, indices)
     
     return state
 
@@ -260,13 +261,20 @@ def ansatz_circ_quimb(params, num_qubits, depth):
     import quimb.tensor as qtn
     circ = qtn.Circuit(num_qubits)
 
-    # Current offset into the parameter array
-    off = 0
+    num_2_per_layer = num_qubits // 2
+    num_2 = num_2_per_layer * depth
+    # Split the parameter array into the RZZ and U3 parameters
+    rzz_params = params[:num_2]
+    u3_params = params[num_2:]
+
+    # Current offset into the parameter arrays
+    u3_off = 0
+    rzz_off = 0
 
     # Start with a one-qubit layer on all qubits
     for i in range(num_qubits):
-        theta, phi, lamda = params[off:off+3]
-        off += 3
+        theta, phi, lamda = u3_params[u3_off:u3_off+3]
+        u3_off += 3
         circ.apply_gate("U3", theta, phi, lamda, i,
                         gate_round=0, parametrize=True)
     
@@ -276,16 +284,16 @@ def ansatz_circ_quimb(params, num_qubits, depth):
         
         # Apply an RZZ layer
         for i, j in pairs:
-            theta = params[off]
-            off += 1
+            theta = rzz_params[rzz_off]
+            rzz_off += 1
             circ.apply_gate("RZZ", theta, i, j,
                             gate_round=layer, parametrize=True)
 
         # Apply a U3 layer, but only to the qubits that were paired
         indices = list(sum(pairs, ())) # This flattens the list of paired indices
         for i in indices:
-            theta, phi, lamda = params[off:off+3]
-            off += 3
+            theta, phi, lamda = u3_params[u3_off:u3_off+3]
+            u3_off += 3
             circ.apply_gate("U3", theta, phi, lamda, i,
                             gate_round=layer+1, parametrize=True)
 
