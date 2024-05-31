@@ -189,7 +189,7 @@ def num_ansatz_params_per_iter(num_qubits, depth):
 ##    num_2 = num_2_per_layer * depth
 ##    return num_2 + 3 * num_1
 
-def apply_ansatz_circuit(params, state, depth):
+def apply_ansatz_circuit(params, state, num_qubits, depth):
     """Apply a 1D ansatz circuit with given parameters.
     This is for a 1D cyclic brickwork architecture with alternating U3 and RZZ gates.
 
@@ -198,7 +198,9 @@ def apply_ansatz_circuit(params, state, depth):
     params : jax array
         Parameters of the gates. Should have length `num_ansatz_params_per_iter(n, depth)`.
     state : jax array
-        State to apply the circuit to. Should have shape `[2] * n` for some `n`.
+        State to apply the circuit to. Should have shape `[2] * num_qubits`.
+    num_qubits : int
+        Number of qubits in the state.
     depth : int
         Depth of the ansatz circuit, as measured by number of two-qubit layers.
 
@@ -208,9 +210,6 @@ def apply_ansatz_circuit(params, state, depth):
         The state with the parametrized ansatz circuit applied.
     """
 
-    # In principle, depth could be inferred from params,
-    # just like we infer the number of qubits from the state below
-    num_qubits = len(state.shape)
     num_2_per_layer = num_qubits // 2
     num_2 = num_2_per_layer * depth
     # Split the parameter array into the RZZ and U3 parameters
@@ -301,7 +300,7 @@ def iterated_ansatz_state(params, num_qubits, depth):
     # A trick borrowed from https://github.com/CQCL/qujax/blob/main/qujax/utils.py#L496
     # This speeds up compilation by iterating the ansatz circuit many times
     def apply_once(state, iter_params):
-        return apply_ansatz_circuit(iter_params, state, depth), None
+        return apply_ansatz_circuit(iter_params, state, num_qubits, depth), None
     
     # Infer the number of repetitions in the first dimension
     reshaped_ansatz_params = ansatz_params.reshape(-1, num_ansatz_params_per_iter(num_qubits, depth))
