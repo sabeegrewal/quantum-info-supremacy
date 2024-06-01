@@ -168,7 +168,7 @@ def brickwork_pairs(num_qubits, layer):
     return sorted([((layer+i) % num_qubits, (layer+i+1) % num_qubits) for i in range(0, num_qubits-1, 2)])
 
 # Does this jit decorator do anything?
-@partial(jax.jit, static_argnums=[2, 3])
+# @partial(jax.jit, static_argnums=[2, 3])
 def apply_brickwork_layer(params, state, num_qubits, layer):
     """Apply a layer of RZZ gates followed by a layer of U3 gates in a brickwork fashion.
 
@@ -231,6 +231,33 @@ def apply_ansatz_circuit(params, state, num_qubits, depth):
     # combination of 1 ZZ + 2 U3 gates uses 1 + 2 * 3 = 7 parameters.
     params_reshaped = params.reshape(depth, (num_qubits // 2) * 7)
 
+    for layer in range(depth):
+        state = apply_brickwork_layer(params_reshaped[layer], state, num_qubits, layer)
+        
+    return state
+    
+def apply_ansatz_circuit_fast(params, state, num_qubits, depth):
+    """Apply a 1D ansatz circuit with given parameters.
+    This is for a 1D cyclic brickwork architecture with alternating RZZ and U3 gates.
+    This should be faster than `apply_ansatz_circuit` after jit compiling.
+
+    Parameters
+    ----------
+    params : jax array
+        Parameters of the gates. Should have length `depth * (num_qubits // 2) * 7`.
+    state : jax array
+        State to apply the circuit to. Should have shape `[2] * num_qubits`.
+    num_qubits : int
+        Number of qubits.
+    depth : int
+        Depth of the ansatz circuit, as measured by number of two-qubit layers.
+
+    Returns
+    -------
+    jax array
+        The state with the parametrized ansatz circuit applied.
+    """
+
     if num_qubits % 2 == 0:
         # For even n, the brickwork pattern repeats every 2 layers
         depth_modulus = 2
@@ -238,15 +265,24 @@ def apply_ansatz_circuit(params, state, num_qubits, depth):
         # For odd n, the brickwork pattern repeats every n layers
         depth_modulus = num_qubits
 
+    iters = depth // depth_modulus
+    remainder = depth % depth_modulus
+
+    num_iter_params = (depth - remainder) * (num_qubits // 2) * 7
+    iter_params = params[:num_iter_params]
+    remainder_params = params[num_iter_params:]
+
     # A trick borrowed from https://github.com/CQCL/qujax/blob/main/qujax/utils.py#L496
     # This speeds up compilation by iterating the ansatz circuit layers many times
-    def apply_once(iter_state_and_layer, iter_params):
-        iter_state, layer = iter_state_and_layer
-        next_layer = (layer+1) % depth_modulus
-        return (apply_brickwork_layer(iter_params, iter_state, num_qubits, layer), next_layer), None
-    state, _ = jax.lax.scan(apply_once, (state, 0), reshaped_ansatz_params)
+    def apply_once(curr_state, curr_params):
+        return apply_ansatz_circuit(curr_params, curr_state, num_qubits, depth_modulus), None
+    iter_params_reshaped = iter_params.reshape(iters, depth_modulus * (num_qubits // 2) * 7)
+    iter_state, _ = jax.lax.scan(apply_once, state, iter_params_reshaped)
 
-    return state
+    if remainder == 0:
+        return iter_state
+    else:
+        return apply_ansatz_circuit(remainder_params, iter_state, num_qubits, remainder)
 
 def state2(theta, phi):
     """Arbitrary one-qubit state with two real parameters.
@@ -315,7 +351,7 @@ def ansatz_state(params, num_qubits, depth):
 
     initial_state = product_state(product_params, num_qubits)
     
-    return apply_ansatz_circuit(circuit_params, initial_state, num_qubits, depth)
+    return apply_ansatz_circuit_fast(circuit_params, initial_state, num_qubits, depth)
 
 def ansatz_circ_quimb(params, num_qubits, depth):
     """Compute the 1D ansatz circuit with given parameters, using quimb.
@@ -364,3 +400,11 @@ def ansatz_circ_quimb(params, num_qubits, depth):
 
     return circ
 
+def ansatz_state_quimb(params, num_qubits, depth):
+    product_params = params[:2*num_qubits]
+    circuit_params = params[2*num_qubits:]
+
+    initial_state = product_state(product_params, num_qubits)
+    circ = ansatz_circ_quimb(circuit_params, num_qubits, depth)
+    
+    return (circ.uni.to_dense() @ initial_state.reshape(2**num_qubits)).reshape([2] * num_qubits)
