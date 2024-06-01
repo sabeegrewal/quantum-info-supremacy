@@ -268,22 +268,23 @@ def state2(theta, phi):
     eip = jnp.exp(1j * phi)
     return jnp.array([ct2, eip * st2])
 
-def product_state(params):
+def product_state(params, num_qubits):
     """Arbitrary product state with given parameters.
 
     Parameters
     ----------
     params : jax array
-        Should have shape `(2 * n)` for some `n`.
+        Should have shape `(2 * num_qubits)`.
+    num_qubits : int
+        Number of qubits.
 
     Returns
     -------
     jax array
-        The corresponding product state as a jax array of shape `[2] * n`.
+        The corresponding product state as a jax array of shape `[2] * num_qubits`.
     """
     
-    # Infer the first dimension, which is the number of qubits
-    params = params.reshape(-1, 2)
+    params = params.reshape(num_qubits, 2)
     result = 1
     for theta, phi in params:
         result = jnp.tensordot(result, state2(theta, phi), axes=[[],[]])
@@ -312,7 +313,7 @@ def ansatz_state(params, num_qubits, depth):
     product_params = params[:2*num_qubits]
     circuit_params = params[2*num_qubits:]
 
-    initial_state = product_state(product_params)
+    initial_state = product_state(product_params, num_qubits)
     
     return apply_ansatz_circuit(circuit_params, initial_state, num_qubits, depth)
 
