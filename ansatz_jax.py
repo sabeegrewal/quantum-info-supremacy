@@ -310,11 +310,11 @@ def ansatz_state(params, num_qubits, depth):
     """
     
     product_params = params[:2*num_qubits]
-    ansatz_params = params[2*num_qubits:]
+    circuit_params = params[2*num_qubits:]
 
     initial_state = product_state(product_params)
     
-    return apply_ansatz_circuit(ansatz_params, initial_state, num_qubits, depth)
+    return apply_ansatz_circuit(circuit_params, initial_state, num_qubits, depth)
 
 def ansatz_circ_quimb(params, num_qubits, depth):
     """Compute the 1D ansatz circuit with given parameters, using quimb.
