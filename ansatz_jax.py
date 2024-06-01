@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as jnp
 
+from functools import partial
+
 def u3(theta, phi, lamda):
     """Arbitrary one-qubit gate with three real parameters.
 
@@ -161,46 +163,60 @@ def brickwork_pairs(num_qubits, layer):
     Returns
     -------
     list[(int, int)]
-        The list of qubits paired at this layer.
+        The list of qubits paired at this layer, sorted.
     """
-    return [((layer+i) % num_qubits, (layer+i+1) % num_qubits) for i in range(0, num_qubits-1, 2)]
-        
+    return sorted([((layer+i) % num_qubits, (layer+i+1) % num_qubits) for i in range(0, num_qubits-1, 2)])
 
-def num_ansatz_params_per_iter(num_qubits, depth):
-    """Numper of continuous parameters in one iteration of the ansatz circuit. This is for a
-    1D cyclic brickwork architecture with alternating U3 and RZZ gates.
-
-    Parameters
-    ----------
-    num_qubits : int
-        Number of qubits in the circuit.
-    depth : int
-        Depth of the circuit, as measured by number of two-qubit layers.
-
-    Returns
-    -------
-    int
-        The number of parameters needed to build such an ansatz circuit.
-    """
-
-    return (num_qubits // 2) * depth * 7
-##    num_2_per_layer = num_qubits // 2
-##    num_1 = 2 * num_2_per_layer * depth
-##    num_2 = num_2_per_layer * depth
-##    return num_2 + 3 * num_1
-
-def apply_ansatz_circuit(params, state, num_qubits, depth):
-    """Apply a 1D ansatz circuit with given parameters.
-    This is for a 1D cyclic brickwork architecture with alternating U3 and RZZ gates.
+# Does this jit decorator do anything?
+@partial(jax.jit, static_argnums=[2, 3])
+def apply_brickwork_layer(params, state, num_qubits, layer):
+    """Apply a layer of RZZ gates followed by a layer of U3 gates in a brickwork fashion.
 
     Parameters
     ----------
     params : jax array
-        Parameters of the gates. Should have length `num_ansatz_params_per_iter(n, depth)`.
+        Parameters of the gates. Should have length `(num_qubits // 2) * 7`.
+    state : jax array
+        Should have shape `[2] * num_qubits`.
+    num_qubits : int
+        Number of qubits in the circuit.
+    layer : int
+        Layer at which gates are being applied.
+
+    Returns
+    -------
+    jax array
+        The state with the corresponding RZZ and U3 gates applied.
+    """
+
+    # First identify the paired qubits
+    pairs = brickwork_pairs(num_qubits, layer)
+
+    # Extract the parameters used for this layer
+    rzz_params = params[:num_qubits // 2]
+    u3_params = params[num_qubits // 2:]
+    
+    # Apply an RZZ layer
+    state = apply_two_qubit_layer(rzz_params, state, pairs)
+
+    # Apply a U3 layer, but only to the qubits that were paired
+    indices = list(sum(pairs, ())) # This flattens the list of paired indices
+    state = apply_one_qubit_layer(u3_params, state, indices)
+    
+    return state
+
+def apply_ansatz_circuit(params, state, num_qubits, depth):
+    """Apply a 1D ansatz circuit with given parameters.
+    This is for a 1D cyclic brickwork architecture with alternating RZZ and U3 gates.
+
+    Parameters
+    ----------
+    params : jax array
+        Parameters of the gates. Should have length `depth * (num_qubits // 2) * 7`.
     state : jax array
         State to apply the circuit to. Should have shape `[2] * num_qubits`.
     num_qubits : int
-        Number of qubits in the state.
+        Number of qubits.
     depth : int
         Depth of the ansatz circuit, as measured by number of two-qubit layers.
 
@@ -210,25 +226,26 @@ def apply_ansatz_circuit(params, state, num_qubits, depth):
         The state with the parametrized ansatz circuit applied.
     """
 
-    num_2_per_layer = num_qubits // 2
-    num_2 = num_2_per_layer * depth
-    # Split the parameter array into the RZZ and U3 parameters
-    rzz_params = params[:num_2]
-    u3_params = params[num_2:]
+    # Reshape the parameter array into the parameters used at each layer.
+    # There are (num_qubits // 2) ZZ gates at each layer, and each
+    # combination of 1 ZZ + 2 U3 gates uses 1 + 2 * 3 = 7 parameters.
+    params_reshaped = params.reshape(depth, (num_qubits // 2) * 7)
 
-    for layer in range(depth):
-        # First identify the paired qubits
-        pairs = brickwork_pairs(num_qubits, layer)
-        
-        # Apply an RZZ layer
-        rzz_off = layer*num_2_per_layer
-        state = apply_two_qubit_layer(rzz_params[rzz_off:rzz_off+num_2_per_layer], state, pairs)
+    if num_qubits % 2 == 0:
+        # For even n, the brickwork pattern repeats every 2 layers
+        depth_modulus = 2
+    else:
+        # For odd n, the brickwork pattern repeats every n layers
+        depth_modulus = num_qubits
 
-        # Apply a U3 layer, but only to the qubits that were paired
-        indices = list(sum(pairs, ())) # This flattens the list of paired indices
-        u3_off = 6*layer*num_2_per_layer
-        state = apply_one_qubit_layer(u3_params[u3_off:u3_off+6*num_2_per_layer], state, indices)
-    
+    # A trick borrowed from https://github.com/CQCL/qujax/blob/main/qujax/utils.py#L496
+    # This speeds up compilation by iterating the ansatz circuit layers many times
+    def apply_once(iter_state_and_layer, iter_params):
+        iter_state, layer = iter_state_and_layer
+        next_layer = (layer+1) % depth_modulus
+        return (apply_brickwork_layer(iter_params, iter_state, num_qubits, layer), next_layer), None
+    state, _ = jax.lax.scan(apply_once, (state, 0), reshaped_ansatz_params)
+
     return state
 
 def state2(theta, phi):
@@ -272,7 +289,7 @@ def product_state(params):
         result = jnp.tensordot(result, state2(theta, phi), axes=[[],[]])
     return result
 
-def iterated_ansatz_state(params, num_qubits, depth):
+def ansatz_state(params, num_qubits, depth):
     """Compute the output state of an iterated 1D ansatz circuit with given parameters.
     This is for a 1D cyclic brickwork architecture with alternating U3 and RZZ gates,
     where the initial state is a product state.
@@ -280,11 +297,11 @@ def iterated_ansatz_state(params, num_qubits, depth):
     Parameters
     ----------
     params : jax array
-        Parameters of the gates. Should have length `num_total_ansatz_params(num_qubits, depth)`.
+        Parameters of the gates. Should have length `2 * num_qubits + depth * (num_qubits // 2) * 7`.
     num_qubits : int
         Number of qubits.
     depth : int
-        Depth of the ansatz circuit iterations, as measured by number of two-qubit layers.
+        Depth of the ansatz circuit, as measured by number of two-qubit layers.
 
     Returns
     -------
@@ -297,37 +314,7 @@ def iterated_ansatz_state(params, num_qubits, depth):
 
     initial_state = product_state(product_params)
     
-    # A trick borrowed from https://github.com/CQCL/qujax/blob/main/qujax/utils.py#L496
-    # This speeds up compilation by iterating the ansatz circuit many times
-    def apply_once(state, iter_params):
-        return apply_ansatz_circuit(iter_params, state, num_qubits, depth), None
-    
-    # Infer the number of repetitions in the first dimension
-    reshaped_ansatz_params = ansatz_params.reshape(-1, num_ansatz_params_per_iter(num_qubits, depth))
-    result, _ = jax.lax.scan(apply_once, initial_state, reshaped_ansatz_params)
-    return result
-
-def num_total_ansatz_params(num_qubits, depth, iters):
-    """Numper of continuous parameters in an iterated ansatz circuit. This is for a
-    1D cyclic brickwork architecture with alternating U3 and RZZ gates, where the initial
-    state is a product state.
-
-    Parameters
-    ----------
-    num_qubits : int
-        Number of qubits in the circuit.
-    depth : int
-        Depth of the circuit, as measured by number of two-qubit layers.
-
-    Returns
-    -------
-    int
-        The number of parameters needed to build such an ansatz circuit.
-    """
-
-    # 2 * num_qubits is for the product state
-    # Rest is for the iterated ansatz circuit
-    return 2 * num_qubits + iters * num_ansatz_params_per_iter(num_qubits, depth)
+    return apply_ansatz_circuit(ansatz_params, initial_state, num_qubits, depth)
 
 def ansatz_circ_quimb(params, num_qubits, depth):
     """Compute the 1D ansatz circuit with given parameters, using quimb.
@@ -337,7 +324,7 @@ def ansatz_circ_quimb(params, num_qubits, depth):
     Parameters
     ----------
     params : jax array
-        Parameters of the gates. Should have length `num_ansatz_params_per_iter(num_qubits, depth)`.
+        Parameters of the gates. Should have length `depth * (num_qubits // 2) * 7`.
     num_qubits : int
         Number of qubits in the circuit and its output state.
     depth : int
@@ -352,22 +339,8 @@ def ansatz_circ_quimb(params, num_qubits, depth):
     import quimb.tensor as qtn
     circ = qtn.Circuit(num_qubits)
 
-    num_2_per_layer = num_qubits // 2
-    num_2 = num_2_per_layer * depth
-    # Split the parameter array into the RZZ and U3 parameters
-    rzz_params = params[:num_2]
-    u3_params = params[num_2:]
-
-    # Current offset into the parameter arrays
-    u3_off = 0
-    rzz_off = 0
-
-##    # Start with a one-qubit layer on all qubits
-##    for i in range(num_qubits):
-##        theta, phi, lamda = u3_params[u3_off:u3_off+3]
-##        u3_off += 3
-##        circ.apply_gate("U3", theta, phi, lamda, i,
-##                        gate_round=0, parametrize=True)
+    # Current offset into the parameter array
+    off = 0
     
     for layer in range(depth):
         # First identify the paired qubits
@@ -375,16 +348,16 @@ def ansatz_circ_quimb(params, num_qubits, depth):
         
         # Apply an RZZ layer
         for i, j in pairs:
-            theta = rzz_params[rzz_off]
-            rzz_off += 1
+            theta = params[off]
+            off += 1
             circ.apply_gate("RZZ", theta, i, j,
                             gate_round=layer, parametrize=True)
 
         # Apply a U3 layer, but only to the qubits that were paired
         indices = list(sum(pairs, ())) # This flattens the list of paired indices
         for i in indices:
-            theta, phi, lamda = u3_params[u3_off:u3_off+3]
-            u3_off += 3
+            theta, phi, lamda = params[off:off+3]
+            off += 3
             circ.apply_gate("U3", theta, phi, lamda, i,
                             gate_round=layer+1, parametrize=True)
 
