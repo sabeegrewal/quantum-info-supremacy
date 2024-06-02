@@ -40,8 +40,8 @@ class AnsatzOptimizer:
     def noisy_loss(self, all_params, target_state):
         noisy_params = self.zzphase_params(all_params).flatten()
         # Overall fidelity is the product of individual gate fidelities
-        fidelity_from_noise = jnp.prod(zzphase_fidelity(params))
-        return fidelity_from_noise * self.loss_fn(all_params, target_state)
+        fidelity_from_noise = jnp.prod(zzphase_fidelity(noisy_params))
+        return fidelity_from_noise * self.loss(all_params, target_state)
 
     def num_params(self, depth):
         if depth % self.depth_modulus != 0:
