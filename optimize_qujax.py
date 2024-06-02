@@ -45,7 +45,7 @@ class AnsatzOptimizer:
 
     def num_params(self, depth):
         if depth % self.depth_modulus != 0:
-            raise "depth must be an integer multiple of depth_modulus"
+            raise Exception("depth must be an integer multiple of depth_modulus")
         # 2*n: initial product state parameters
         # 7*(n//2): ansatz circuit paramaters per layer of 2-qubit gates (1 for ZZ, 2*3 for U3)
         # There are depth many layers total
@@ -54,14 +54,14 @@ class AnsatzOptimizer:
     def optimize(self, target_state, depth,
                  method="L-BFGS-B", noisy=False, maxiter=2500, init_params=None):
         if depth % self.depth_modulus != 0:
-            raise "depth must be an integer multiple of depth_modulus"
+            raise Exception("depth must be an integer multiple of depth_modulus")
 
         # TODO do this with a seed
         if init_params is None:
             init_params = np.random.normal(scale=0.2, size=self.num_params(depth))
         init_params = jnp.array(init_params)
         if init_params.shape != (self.num_params(depth),):
-            raise "init_params must be a 1D array of length num_params(depth)"
+            raise Exception("init_params must be a 1D array of length num_params(depth)")
         
         if noisy:
             value_and_grad = self.noisy_loss_and_grad
