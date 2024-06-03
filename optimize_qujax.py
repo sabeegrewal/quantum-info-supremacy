@@ -2,15 +2,21 @@ import jax
 import jax.numpy as jnp
 
 import numpy as np
+import scipy
 
 from ansatz_qujax import *
 
-import scipy
-
-import matplotlib.pyplot as plt
-
+# Class for optimizing ansatz circuits for quantum state preparation
 class AnsatzOptimizer:
     def __init__(self, n):
+        """Class constructor for ansatz circuit optimizer.
+
+        Parameters
+        ----------
+        n : int
+            Number of qubits in the state.
+        """
+        
         self.n = n
         if n % 2 == 0:
             self.depth_modulus = 2
@@ -21,15 +27,47 @@ class AnsatzOptimizer:
         self.noisy_loss_and_grad = jax.jit(jax.value_and_grad(self.noisy_loss))
 
     def zzphase_params(self, all_params):
+        """Given a list of parameters to the ansatz circuit, identify the parameters
+        corresponding to ZZ gates.
+
+        Parameters
+        ----------
+        all_params : jax array
+            Parameters for the ansatz circuit.
+            Should have length `n*2 + 7*(n//2)*depth` for some `depth` dividing `depth_modulus`.
+
+        Returns
+        -------
+        jax array
+            A jax array of length `(n//2)*depth` containing all of the ZZ parameters.
+        """
+        
         # Ignore the initial state parameters at the front
         circ_params = all_params[2*self.n:]
         # Reshape the parameter array into blocks of the appropriate length for the repeated circuit
         # Infer the number of repetitions, which is the first coordinate
         reshaped_params = circ_params.reshape(-1, 7 * (self.n // 2) * self.depth_modulus)
         # In each row, the first (n // 2) * self.depth_modulus parameters correspond to ZZs
-        return reshaped_params[:,:(self.n // 2) * self.depth_modulus]
+        return reshaped_params[:,:(self.n // 2) * self.depth_modulus].flatten()
 
     def loss(self, all_params, target_state):
+        """Given a parameterized ansatz circuit and a target state, compute the loss function
+        for the ansatz circuit's output fidelity.
+
+        Parameters
+        ----------
+        all_params : jax array
+            Parameters for the ansatz circuit.
+            Should have length `num_params(depth)` for some `depth` divisible by `depth_modulus`.
+        target_state : jax array
+            The target state. Should have shape `[2] * n`.
+
+        Returns
+        -------
+        real
+            The loss for this target state.
+        """
+        
         product_params = all_params[:2*self.n]
         circ_params = all_params[2*self.n:]
 
@@ -38,12 +76,44 @@ class AnsatzOptimizer:
         return -abs(jnp.vdot(target_state, output_state))**2
 
     def noisy_loss(self, all_params, target_state):
-        noisy_params = self.zzphase_params(all_params).flatten()
+        """Given a parameterized ansatz circuit and a target state, compute the loss function
+        for the ansatz circuit's output fidelity, assuming that the circuit is corrupted by
+        experimental noise.
+
+        Parameters
+        ----------
+        all_params : jax array
+            Parameters for the ansatz circuit.
+            Should have length `n*2 + 7*(n//2)*depth` for some `depth` dividing `depth_modulus`.
+        target_state : jax array
+            The target state. Should have shape `[2] * n`.
+
+        Returns
+        -------
+        real
+            The loss for this target state.
+        """
+        
+        noisy_params = self.zzphase_params(all_params)
         # Overall fidelity is the product of individual gate fidelities
         fidelity_from_noise = jnp.prod(zzphase_fidelity(noisy_params))
         return fidelity_from_noise * self.loss(all_params, target_state)
 
     def num_params(self, depth):
+        """The total number of continuous parameters in an ansatz circuit of the given depth.
+        
+        Parameters
+        ----------
+        depth : int
+            Depth of the ansatz circuit, as measured by the number of two-qubit ZZ layers.
+            Must be divisible by `depth_modulus`.
+
+        Returns
+        -------
+        int
+            Number of ansatz parameters.
+        """
+        
         if depth % self.depth_modulus != 0:
             raise Exception("depth must be an integer multiple of depth_modulus")
         # 2*n: initial product state parameters
@@ -53,6 +123,34 @@ class AnsatzOptimizer:
 
     def optimize(self, target_state, depth,
                  method="L-BFGS-B", noisy=False, maxiter=2500, init_params=None):
+        """Optimize the ansatz circuit with respect to the target state.
+        
+        Parameters
+        ----------
+        target_state : jax array
+            The target state. Should have shape `[2] * n`.
+        depth : int
+            Depth of the ansatz circuit, as measured by the number of two-qubit ZZ layers.
+            Must be divisible by `depth_modulus`.
+        method : str
+            Scipy optimizer method to use. Defaults to `"L-BFGS-B"`.
+        noisy : bool
+            Whether to optimize the loss function accounting for experimental noise.
+            Defaults to `False`.
+        maxiter : int
+            Maximum number of iterations for the optimizer. Defaults to `2500`.
+        init_params : jax_array or None
+            If provided, the initial parameters for the ansatz circuit.
+            Must have length `num_params(depth)`.
+            If `None`, the initial parameters are chosen randomly.
+
+        Returns
+        -------
+        scipy OptimizeResult
+            The result of running the scipy optimization.
+        """
+        
+        
         if depth % self.depth_modulus != 0:
             raise Exception("depth must be an integer multiple of depth_modulus")
 
@@ -76,7 +174,6 @@ class AnsatzOptimizer:
                                       options={"maxiter": maxiter})
         return opt
 
-jax.config.update("jax_traceback_filtering", "off")
 
 n = 10
 optimizer = AnsatzOptimizer(n)
