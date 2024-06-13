@@ -36,7 +36,7 @@ def brickwork_circuit_gates(num_qubits, depth):
 
     Returns
     -------
-    (gates, qubit_inds, param_inds, parameter_index)
+    (gates, qubit_inds, param_inds, num_params)
         gates : names of gates in the circuit, in order of application.
         qubit_inds : indices at which the gates are applied.
         param_inds : indices into the parameter array to be used for each gate.
