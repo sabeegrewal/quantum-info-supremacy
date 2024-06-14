@@ -50,6 +50,28 @@ class AnsatzOptimizer:
         # In each row, the first (n // 2) * self.depth_modulus parameters correspond to ZZs
         return reshaped_params[:,:(self.n // 2) * self.depth_modulus].flatten()
 
+    def output_state(self, all_params):
+        """Given a parameterized ansatz circuit and a target state, compute state
+        output by the circuit.
+
+        Parameters
+        ----------
+        all_params : jax array
+            Parameters for the ansatz circuit.
+            Should have length `num_params(depth)` for some `depth` divisible by `depth_modulus`.
+
+        Returns
+        -------
+        jax array
+            The output state as an array of shape `[2] * n`.
+        """
+        
+        product_params = all_params[:2*self.n]
+        circ_params = all_params[2*self.n:]
+
+        initial_state = product_state(product_params)
+        return self.ansatz_fn(circ_params, initial_state)
+
     def loss(self, all_params, target_state):
         """Given a parameterized ansatz circuit and a target state, compute the loss function
         for the ansatz circuit's output fidelity.
@@ -67,12 +89,8 @@ class AnsatzOptimizer:
         real
             The loss for this target state.
         """
-        
-        product_params = all_params[:2*self.n]
-        circ_params = all_params[2*self.n:]
 
-        initial_state = product_state(product_params)
-        output_state = self.ansatz_fn(circ_params, initial_state)
+        output_state = self.output_state(all_params)
         return -abs(jnp.vdot(target_state, output_state))**2
 
     def noisy_loss(self, all_params, target_state):
