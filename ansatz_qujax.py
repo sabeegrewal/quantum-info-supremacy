@@ -116,12 +116,13 @@ def state2(theta, phi):
         The one-qubit state equivalent to U3(theta, phi, _)|0> as a jax array of shape `(2)`.
     """
 
-    # TODO reparametrize these please
-    theta_2 = theta / 2
-    ct2 = jnp.cos(theta / 2)
-    st2 = jnp.sin(theta / 2)
-    eip = jnp.exp(1j * phi)
-    return jnp.array([ct2, eip * st2])
+    # Matching the conventions of qujax: https://cqcl.github.io/qujax/gates.html
+    # Also matches Quantinuum: https://tket.quantinuum.com/api-docs/optype.html
+    pitheta_2 = jnp.pi * theta / 2
+    cpt2 = jnp.cos(pitheta_2)
+    spt2 = jnp.sin(pitheta_2)
+    eipp = jnp.exp(1j * jnp.pi * phi)
+    return jnp.array([cpt2, eipp * spt2])
 
 def product_state(params):
     """Arbitrary product state with given parameters.
