@@ -4,6 +4,11 @@ import jax.numpy as jnp
 import numpy as np
 import scipy
 
+from qiskit import QuantumCircuit
+
+from pytket import Circuit
+from pytket.extensions.quantinuum import QuantinuumBackend, QuantinuumAPIOffline
+
 from ansatz_qujax import *
 
 # Class for optimizing ansatz circuits for quantum state preparation
@@ -22,6 +27,7 @@ class AnsatzOptimizer:
             self.depth_modulus = 2
         else:
             self.depth_modulus = n
+        self.modulus_gates = brickwork_circuit_gates(n, self.depth_modulus)
         self.ansatz_fn = make_brickwork_ansatz_fn(n, self.depth_modulus)
         self.loss_and_grad = jax.jit(jax.value_and_grad(self.loss))
         self.noisy_loss_and_grad = jax.jit(jax.value_and_grad(self.noisy_loss))
@@ -192,5 +198,91 @@ class AnsatzOptimizer:
                                       options={"maxiter": maxiter})
         return opt
 
+    def pytket_circuit(self, all_params):
+        """Output a pytket circuit with the desired parameters.
+        
+        Parameters
+        ----------
+        all_params : jax array
+            Parameters for the ansatz circuit.
+            Must have length `num_params(depth)` for some `depth` dividing `depth_modulus`.
 
+        Returns
+        -------
+        pytket Circuit
+            The corresponding circuit.
+        """
+        
+        gates_per_mod, qubit_inds, param_inds, num_params_per_mod = self.modulus_gates
 
+        product_params = all_params[:2*self.n]
+        circ_params = all_params[2*self.n:]
+
+        qc = Circuit(self.n)
+
+        product_params_reshaped = product_params.reshape(self.n, 2)
+        for i in range(self.n):
+            theta, phi = product_params_reshaped[i]
+            qc.U3(theta, phi, 0, i)
+
+        circ_params_reshaped = circ_params.reshape(-1, num_params_per_mod)
+        for iter_circ_params in circ_params_reshaped:
+            for i in range(len(gates_per_mod)):
+                if gates_per_mod[i] == "ZZPhase":
+                    theta = iter_circ_params[param_inds[i]][0]
+                    qubit1, qubit2 = qubit_inds[i]
+                    qc.ZZPhase(theta, qubit1, qubit2)
+                elif gates_per_mod[i] == "U3":
+                    theta, phi, lamda = iter_circ_params[param_inds[i]]
+                    qubit = qubit_inds[i][0]
+                    qc.U3(theta, phi, lamda, qubit)
+                else:
+                    raise Exception("gate is neither ZZ nor U3")
+
+        return qc
+
+    def qiskit_circuit(self, all_params):
+        """Output a qiskit circuit with the desired parameters.
+        
+        Parameters
+        ----------
+        all_params : jax array
+            Parameters for the ansatz circuit.
+            Must have length `num_params(depth)` for some `depth` dividing `depth_modulus`.
+
+        Returns
+        -------
+        qiskit QuantumCircuit
+            The corresponding circuit.
+        """
+
+        # TODO maybe combine this method with pytket_circuit to avoid code redundancy
+        gates_per_mod, qubit_inds, param_inds, num_params_per_mod = self.modulus_gates
+
+        # Need to multiply by pi because qujax's conventions are different from qiskit's
+        all_params = all_params * np.pi
+        product_params = all_params[:2*self.n]
+        circ_params = all_params[2*self.n:]
+
+        qc = QuantumCircuit(self.n)
+
+        product_params_reshaped = product_params.reshape(self.n, 2)
+        for i in range(self.n):
+            theta, phi = product_params_reshaped[i]
+            qc.u(theta, phi, 0, i)
+
+        circ_params_reshaped = circ_params.reshape(-1, num_params_per_mod)
+        for iter_circ_params in circ_params_reshaped:
+            for i in range(len(gates_per_mod)):
+                if gates_per_mod[i] == "ZZPhase":
+                    theta = iter_circ_params[param_inds[i]][0]
+                    qubit1, qubit2 = qubit_inds[i]
+                    qc.rzz(theta, qubit1, qubit2)
+                elif gates_per_mod[i] == "U3":
+                    theta, phi, lamda = iter_circ_params[param_inds[i]]
+                    qubit = qubit_inds[i]
+                    qc.u(theta, phi, lamda, qubit)
+                else:
+                    raise Exception("gate is neither ZZ nor U3")
+
+        return qc
