@@ -193,19 +193,4 @@ class AnsatzOptimizer:
         return opt
 
 
-n = 10
-optimizer = AnsatzOptimizer(n)
 
-for depth in range(6, 7):
-    all_two_qubit_params = []
-    for i in range(10):
-        init_params = np.random.normal(size=optimizer.num_params(depth), scale=1.0)
-        
-        target_state = np.random.normal(size=([2] * n)) + 1j * np.random.normal(size=([2] * n))
-        target_state = target_state / np.linalg.norm(target_state)
-
-        opt = optimizer.optimize(target_state, depth)
-        print(opt.fun)
-        all_two_qubit_params.append(optimizer.zzphase_params(opt.x))
-    plt.hist(jnp.array(all_two_qubit_params).flatten(), bins=50)
-    plt.show()
