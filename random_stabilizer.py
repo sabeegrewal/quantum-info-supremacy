@@ -56,6 +56,28 @@ def stabilizer_codim_distribution_cumulative(n):
         result[d] = result[d] / cumulative
     return result
 
+def random_stabilizer_dim(n):
+    """Sample the dimension of the affine subspace of a
+    random stabilizer state.
+
+    Parameters
+    ----------
+    n : int
+        Number of qubits in the stabilizer state.
+
+    Returns
+    -------
+    int
+        A number in [0, n].
+    """
+    
+    dist = stabilizer_codim_distribution_cumulative(n)
+    r = random.random() # Uniform on [0, 1]
+    for d in range(n+1):
+        if r < dist[d]:
+            # Subtract from n to get dimension from codimension 
+            return n - d
+
 def reduced_row_echelon_and_rank(mat):
     """Compute the reduced row echelon form and rank of a matrix over F2.
 
@@ -122,28 +144,6 @@ def random_full_rank_reduced(rows, cols):
         reduced_mat, rank = reduced_row_echelon_and_rank(mat)
         if rank == goal_rank:
             return reduced_mat
-
-def random_stabilizer_dim(n):
-    """Sample the dimension of the affine subspace of a
-    random stabilizer state.
-
-    Parameters
-    ----------
-    n : int
-        Number of qubits in the stabilizer state.
-
-    Returns
-    -------
-    int
-        A number in [0, n].
-    """
-    
-    dist = stabilizer_codim_distribution_cumulative(n)
-    r = random.random() # Uniform on [0, 1]
-    for d in range(n+1):
-        if r < dist[d]:
-            # Subtract from n to get dimension from codimension 
-            return n - d
 
 def stabilizer_gate_list(n):
     """The list of gates that can be toggled on/off to
