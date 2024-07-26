@@ -205,7 +205,7 @@ def random_stabilizer_toggles(n):
     # Hadamard the qubits corresponding to any leading 1
     # The .nonzero()[0][0] reports the first entry that is True
     # Since the matrix is full-rank it will always succeed
-    hadamard_qubits = [row.nonzero()[0][0] for row in mat]
+    leading_qubits = [row.nonzero()[0][0] for row in mat]
 
     result = []
     # X layer
@@ -215,20 +215,20 @@ def random_stabilizer_toggles(n):
     # Hadamard layer
     for i in range(n):
         # Apply Hadamard gates to qubits in the set
-        result.append(i in hadamard_qubits)
+        result.append(i in leading_qubits)
     # Phase layer
     for i in range(n):
         # Apply S gates uniformly at random,
         # but only to qubits in the set
-        result.append(i in hadamard_qubits
+        result.append(i in leading_qubits
                       and random.getrandbits(1) == 1)
     # CZ layer
     for i in range(n):
         for j in range(i+1, n):
             # Apply CZ gates uniformly at random,
             # but only to pairs of qubits in the set
-            result.append(i in hadamard_qubits and
-                          j in hadamard_qubits and
+            result.append(i in leading_qubits and
+                          j in leading_qubits and
                           random.getrandbits(1) == 1)
     # CNOT layer
     for i in range(n):
@@ -236,8 +236,8 @@ def random_stabilizer_toggles(n):
             # Apply CNOT gates between the set and its complement
             # according to the matrix we sampled
             if j != i:
-                result.append(i in hadamard_qubits and
-                              j not in hadamard_qubits and
-                              mat[hadamard_qubits.index(i)][j])
-                # hadamard_qubits.index(i) looks up the row corresponding to i
+                result.append(i in leading_qubits and
+                              j not in leading_qubits and
+                              mat[leading_qubits.index(i)][j])
+                # leading_qubits.index(i) looks up the row corresponding to i
     return result
