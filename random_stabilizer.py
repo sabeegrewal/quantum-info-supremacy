@@ -1,5 +1,6 @@
 import random
 import functools
+import numpy as np
 
 def eta(n, d):
     """Computes the function eta defined Eq. (80) of
@@ -54,6 +55,44 @@ def stabilizer_codim_distribution_cumulative(n):
     for d in range(n+1):
         result[d] = result[d] / cumulative
     return result
+
+def reduced_row_echelon_and_rank(mat):
+    """Computes the reduced row echelon form and rank of a matrix over F2.
+
+    Parameters
+    ----------
+    mat : array[bool][bool]
+        2D numpy array of Booleans, where True = 1 and False = 0 mod 2.
+
+    Returns
+    -------
+    (array[bool][bool], int)
+        The reduced row echelon form of the matrix and its rank.
+    """
+    
+    mat = mat.copy()
+    nr_rows, nr_cols = mat.shape
+
+    # The next row in which we're trying to add a leading 1,
+    # which is also a record of the rank so far
+    curr_rank = 0
+    for col in range(nr_cols):
+        # First try to make mat[curr_rank][col] equal 1
+        for row in range(curr_rank + 1, nr_rows):
+            if mat[row][col] and not mat[curr_rank][col]:
+                # XOR into the goal row
+                mat[curr_rank] = np.logical_xor(mat[curr_rank], mat[row])
+                break
+        # Now zero out the rest of the column, if possible
+        if mat[curr_rank][col]:
+            for row in range(nr_rows):
+                if row != curr_rank and mat[row][col]:
+                    mat[row] = np.logical_xor(mat[curr_rank], mat[row])
+            curr_rank += 1
+        if curr_rank == nr_rows:
+            # This means we're done, since the rank can't be more than m
+            break
+    return (mat, curr_rank)
 
 def random_stabilizer_dim(n):
     """Sample the dimension of the affine subspace of a
