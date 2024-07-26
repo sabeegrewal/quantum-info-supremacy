@@ -241,3 +241,107 @@ def random_stabilizer_toggles(n):
                               mat[leading_qubits.index(i)][j])
                 # leading_qubits.index(i) looks up the row corresponding to i
     return result
+
+def stabilizer_gate_list_ag(n):
+    """The list of gates that can be toggled on/off to synthesize
+    a generic stabilizer state in Aaronson-Gottesman form. This
+    means that we first prepare a graph state and Hadamard some
+    of the qubits. Comparable to
+    https://docs.quantum.ibm.com/api/qiskit/synthesis#stabilizer-state-synthesis
+
+    Parameters
+    ----------
+    n : int
+        Number of qubits in the stabilizer state.
+
+    Returns
+    -------
+    list[str, tup[int]]
+        A list of gate names and qubits that the gates act on.
+    """
+
+    result = []
+
+    # X layer
+    for i in range(n):
+        result.append(("x", (i,)))
+    # Hadamard layer
+    for i in range(n):
+        result.append(("h", (i,)))
+    # Phase layer
+    for i in range(n):
+        result.append(("s", (i,)))
+    # CZ layer
+    for i in range(n):
+        for j in range(i+1, n):
+            result.append(("cz", (i, j)))
+    # Hadamard layer
+    for i in range(n):
+        result.append(("h", (i,)))
+    return result
+
+def random_stabilizer_toggles_ag(n):
+    """Generate a random stabilizer state as a list of
+    gates to toggle in `stabilizer_gate_list_ag(n)`.
+
+    Parameters
+    ----------
+    n : int
+        Number of qubits in the stabilizer state.
+
+    Returns
+    -------
+    list[bool]
+        A list of the same length as `stabilizer_gate_list_ag(n)`
+        indicating which gates to toggle.
+    """
+
+    # Sample the dimension of the affine subspace
+    dim = random_stabilizer_dim(n)
+    # Sample the vector space of the right dimension
+    mat = random_full_rank_reduced(dim, n)
+    # At the end, Hadamard the qubits not corresponding to any leading 1
+    # The .nonzero()[0][0] reports the first entry that is True
+    # Since the matrix is full-rank it will always succeed
+    leading_qubits = [row.nonzero()[0][0] for row in mat]
+
+    result = []
+    # X layer
+    for i in range(n):
+        # Apply X gates uniformly at random
+        result.append(random.getrandbits(1) == 1)
+    # Hadamard layer
+    for i in range(n):
+        # Apply Hadamard gates to all qubits
+        result.append(True)
+    # Phase layer
+    for i in range(n):
+        # Apply S gates uniformly at random,
+        # but only to qubits in the set
+        result.append(i in leading_qubits
+                      and random.getrandbits(1) == 1)
+    # CZ layer
+    for i in range(n):
+        for j in range(i+1, n):
+            # 3 types of CZ gates:
+            # (1) random gates between qubits in S
+            # (2) gates where i in S and j not in S, as determined by mat
+            # (3) gates where i not in S and j in S, as determined by mat
+            # Type (2) and (3) correspond to CNOT gates in random_stabilizer_toggles
+            active_1 = (i in leading_qubits and
+                        j in leading_qubits and
+                        random.getrandbits(1) == 1)
+            active_2 = (i in leading_qubits and
+                        j not in leading_qubits and
+                        mat[leading_qubits.index(i)][j])
+                        # leading_qubits.index(i) looks up the row corresponding to i
+            active_3 = (i not in leading_qubits and
+                        j in leading_qubits and
+                        mat[leading_qubits.index(j)][i])
+                        # leading_qubits.index(j) looks up the row corresponding to j
+            result.append(active_1 or active_2 or active_3)
+    # H layer
+    for i in range(n):
+        result.append(i not in leading_qubits)
+    return result
+
