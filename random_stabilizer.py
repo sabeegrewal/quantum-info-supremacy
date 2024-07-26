@@ -198,21 +198,20 @@ def random_stabilizer_toggles(n):
         indicating which gates to toggle.
     """
 
-    result = []
+    # Sample the dimension of the affine subspace
+    dim = random_stabilizer_dim(n)
+    # Sample the vector space of the right dimension
+    mat = random_full_rank_reduced(dim, n)
+    # Hadamard the qubits corresponding to any leading 1
+    # The .nonzero()[0][0] reports the first entry that is True
+    # Since the matrix is full-rank it will always succeed
+    hadamard_qubits = [row.nonzero()[0][0] for row in mat]
 
+    result = []
     # X layer
     for i in range(n):
         # Apply X gates uniformly at random
         result.append(random.getrandbits(1) == 1)
-
-    # Sample the dimension of the affine subspace
-    dim = random_stabilizer_dim(n)
-    # Now sample the qubits to Hadamard
-    # This is a random subset of size dim
-    hadamard_qubits = list(range(n))
-    random.shuffle(hadamard_qubits)
-    hadamard_qubits = set(hadamard_qubits[:dim])
-    
     # Hadamard layer
     for i in range(n):
         # Apply Hadamard gates to qubits in the set
@@ -234,10 +233,11 @@ def random_stabilizer_toggles(n):
     # CNOT layer
     for i in range(n):
         for j in range(n):
-            # Apply Hadamard gates uniformly at random,
-            # but only between the set and its complement
+            # Apply CNOT gates between the set and its complement
+            # according to the matrix we sampled
             if j != i:
                 result.append(i in hadamard_qubits and
                               j not in hadamard_qubits and
-                              random.getrandbits(1) == 1)
+                              mat[hadamard_qubits.index(i)][j])
+                # hadamard_qubits.index(i) looks up the row corresponding to i
     return result
