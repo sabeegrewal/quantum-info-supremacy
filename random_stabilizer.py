@@ -77,6 +77,9 @@ def reduced_row_echelon_and_rank(mat):
     # which is also a record of the rank so far
     curr_rank = 0
     for col in range(nr_cols):
+        if curr_rank == nr_rows:
+            # This means we're done, since the rank can't be more than m
+            break
         # First try to make mat[curr_rank][col] equal 1
         for row in range(curr_rank + 1, nr_rows):
             if mat[row][col] and not mat[curr_rank][col]:
@@ -89,9 +92,6 @@ def reduced_row_echelon_and_rank(mat):
                 if row != curr_rank and mat[row][col]:
                     mat[row] = np.logical_xor(mat[curr_rank], mat[row])
             curr_rank += 1
-        if curr_rank == nr_rows:
-            # This means we're done, since the rank can't be more than m
-            break
     return (mat, curr_rank)
 
 def random_full_rank_reduced(rows, cols):
