@@ -57,7 +57,7 @@ def stabilizer_codim_distribution_cumulative(n):
     return result
 
 def reduced_row_echelon_and_rank(mat):
-    """Computes the reduced row echelon form and rank of a matrix over F2.
+    """Compute the reduced row echelon form and rank of a matrix over F2.
 
     Parameters
     ----------
@@ -93,6 +93,31 @@ def reduced_row_echelon_and_rank(mat):
             # This means we're done, since the rank can't be more than m
             break
     return (mat, curr_rank)
+
+def random_full_rank_reduced(rows, cols):
+    """Sample a random full-rank matrix over F2 and return its
+    reduced row echelon form.
+
+    Parameters
+    ----------
+    rows : int
+        Number of rows.
+    cols : int
+        Number of columns.
+
+    Returns
+    -------
+    array[bool][bool]
+        The reduced row echelon form of a uniformly random full-rank
+        matrix over F2.
+    """
+    
+    goal_rank = min(rows, cols)
+    while True:
+        mat = np.random.randint(2, size=(rows, cols), dtype=bool)
+        reduced_mat, rank = reduced_row_echelon_and_rank(mat)
+        if rank == goal_rank:
+            return reduced_mat
 
 def random_stabilizer_dim(n):
     """Sample the dimension of the affine subspace of a
