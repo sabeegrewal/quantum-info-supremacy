@@ -114,6 +114,10 @@ def random_full_rank_reduced(rows, cols):
     
     goal_rank = min(rows, cols)
     while True:
+        # This loop succeeds in each iteration with probability
+        # at least 0.288788 in the limit of large dimension,
+        # so it should terminate in a reasonable amount of time.
+        # TODO maybe put a hard upper bound, just in case?
         mat = np.random.randint(2, size=(rows, cols), dtype=bool)
         reduced_mat, rank = reduced_row_echelon_and_rank(mat)
         if rank == goal_rank:
