@@ -342,6 +342,7 @@ def random_stabilizer_toggles_ag(n):
             result.append(active_1 or active_2 or active_3)
     # H layer
     for i in range(n):
+        # Hadamard the qubits without a leading 1
         result.append(i not in leading_qubits)
     return result
 
