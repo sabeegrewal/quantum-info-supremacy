@@ -345,4 +345,3 @@ def random_stabilizer_toggles_ag(n):
         # Hadamard the qubits without a leading 1
         result.append(i not in leading_qubits)
     return result
-
