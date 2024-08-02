@@ -7,7 +7,6 @@ import scipy
 from qiskit import QuantumCircuit
 
 from pytket import Circuit
-from pytket.extensions.quantinuum import QuantinuumBackend, QuantinuumAPIOffline
 
 from ansatz_qujax import *
 
@@ -99,6 +98,26 @@ class AnsatzOptimizer:
         output_state = self.output_state(all_params)
         return -abs(jnp.vdot(target_state, output_state))**2
 
+    def fidelity_from_noise(self, all_params):
+        """Given a parameterized ansatz circuit, compute an estimate of the multiplicative
+        factor on fidelity due to noise
+        
+        Parameters
+        ----------
+        all_params : jax array
+            Parameters for the ansatz circuit.
+            Should have length `n*2 + 7*(n//2)*depth` for some `depth` dividing `depth_modulus`.
+
+        Returns
+        -------
+        real
+            Estimated noise rate.
+        """
+
+        noisy_params = self.zzphase_params(all_params)
+        # Overall fidelity is the product of individual gate fidelities
+        return jnp.prod(zzphase_fidelity(noisy_params))
+
     def noisy_loss(self, all_params, target_state):
         """Given a parameterized ansatz circuit and a target state, compute the loss function
         for the ansatz circuit's output fidelity, assuming that the circuit is corrupted by
@@ -118,10 +137,7 @@ class AnsatzOptimizer:
             The loss for this target state.
         """
         
-        noisy_params = self.zzphase_params(all_params)
-        # Overall fidelity is the product of individual gate fidelities
-        fidelity_from_noise = jnp.prod(zzphase_fidelity(noisy_params))
-        return fidelity_from_noise * self.loss(all_params, target_state)
+        return self.fidelity_from_noise(all_params) * self.loss(all_params, target_state)
 
     def num_params(self, depth):
         """The total number of continuous parameters in an ansatz circuit of the given depth.
