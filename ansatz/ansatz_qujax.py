@@ -1,10 +1,10 @@
-import jax
 import jax.numpy as jnp
 
 import qujax
 from qujax import print_circuit, repeat_circuit, all_zeros_statetensor
 
 # Based on https://github.com/CQCL/qujax/blob/main/examples/reducing_jit_compilation_time.ipynb
+
 
 def brickwork_pairs(num_qubits, layer):
     """Which qubits to pair in a 1D cyclic brickwork circuit.
@@ -21,7 +21,11 @@ def brickwork_pairs(num_qubits, layer):
     list[(int, int)]
         The list of qubits paired at this layer.
     """
-    return [((layer+i) % num_qubits, (layer+i+1) % num_qubits) for i in range(0, num_qubits-1, 2)]
+    return [
+        ((layer + i) % num_qubits, (layer + i + 1) % num_qubits)
+        for i in range(0, num_qubits - 1, 2)
+    ]
+
 
 def brickwork_circuit_gates(num_qubits, depth):
     """Compute the positions of gates in a 1D ansatz circuit. This is for a
@@ -42,7 +46,7 @@ def brickwork_circuit_gates(num_qubits, depth):
         param_inds : indices into the parameter array to be used for each gate.
         num_params : the number of continuous parameters in the circuit.
     """
-    
+
     gates: List[str] = []
     qubit_inds: List[List[int]] = []
     param_inds: List[List[int]] = []
@@ -61,23 +65,24 @@ def brickwork_circuit_gates(num_qubits, depth):
     for layer in range(depth):
         # First identify the paired qubits
         pairs = brickwork_pairs(num_qubits, layer)
-        
+
         # Apply an RZZ layer
         for i, j in pairs:
             gates.append("ZZPhase")
             qubit_inds.append([i, j])
             param_inds.append([rzz_off])
             rzz_off += 1
-        
+
         # Apply a U3 layer, but only to the qubits that were paired
-        indices = list(sum(pairs, ())) # This flattens the list of paired indices
+        indices = list(sum(pairs, ()))  # This flattens the list of paired indices
         for i in indices:
             gates.append("U3")
             qubit_inds.append([i])
-            param_inds.append([u3_off, u3_off+1, u3_off+2])
+            param_inds.append([u3_off, u3_off + 1, u3_off + 2])
             u3_off += 3
 
     return gates, qubit_inds, param_inds, num_params
+
 
 def make_brickwork_ansatz_fn(num_qubits, depth):
     """Returns a function to evaluate the output state of a parametrized circuit.
@@ -97,10 +102,15 @@ def make_brickwork_ansatz_fn(num_qubits, depth):
         the parameters as many times as possible to the input state given the length of params.
     """
 
-    gates, qubit_inds, param_inds, num_params = brickwork_circuit_gates(num_qubits, depth)
+    gates, qubit_inds, param_inds, num_params = brickwork_circuit_gates(
+        num_qubits, depth
+    )
     # Get function that returns one application of the circuit
-    params_to_statetensor = qujax.get_params_to_statetensor_func(gates, qubit_inds, param_inds)
+    params_to_statetensor = qujax.get_params_to_statetensor_func(
+        gates, qubit_inds, param_inds
+    )
     return repeat_circuit(params_to_statetensor, num_params)
+
 
 def state2(theta, phi):
     """Arbitrary one-qubit state with two real parameters.
@@ -124,6 +134,7 @@ def state2(theta, phi):
     eipp = jnp.exp(1j * jnp.pi * phi)
     return jnp.array([cpt2, eipp * spt2])
 
+
 def product_state(params):
     """Arbitrary product state with given parameters.
 
@@ -137,13 +148,14 @@ def product_state(params):
     jax array
         The corresponding product state as a jax array of shape `[2] * n`.
     """
-    
+
     # Infer the first dimension, which is the number of qubits
     params = params.reshape(-1, 2)
     result = 1
     for theta, phi in params:
-        result = jnp.tensordot(result, state2(theta, phi), axes=[[],[]])
+        result = jnp.tensordot(result, state2(theta, phi), axes=[[], []])
     return result
+
 
 def zzphase_fidelity(theta):
     """Approximate fidelity with which we can implement a ZZ gate with given parameter.
@@ -158,13 +170,13 @@ def zzphase_fidelity(theta):
     real or array
         The fidelity (or fidelities) corresponding to theta.
     """
-    
+
     # In qujax, the maximally entangling ZZ gate has theta = 0.5;
     # See https://cqcl.github.io/qujax/gates.html
-    
+
     # First normalize theta to [0, 1), which is equivalent to applying Z gates after if necessary
     theta = jnp.mod(theta, 1)
     # Then normalize to [0, 1/2), which is equivalent to conjugating one qubit by X if necessary
-    theta = 1/2 - jnp.abs(theta - 1/2)
+    theta = 1 / 2 - jnp.abs(theta - 1 / 2)
     # Finally compute a linear function
     return 1 - (1.2 * theta + 0.4) * 0.0011

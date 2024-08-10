@@ -8,7 +8,8 @@ from qiskit import QuantumCircuit
 
 from pytket import Circuit
 
-from ansatz_qujax import *
+from ansatz.ansatz_qujax import *
+
 
 # Class for optimizing ansatz circuits for quantum state preparation
 class AnsatzOptimizer:
@@ -20,7 +21,7 @@ class AnsatzOptimizer:
         n : int
             Number of qubits in the state.
         """
-        
+
         self.n = n
         if n % 2 == 0:
             self.depth_modulus = 2
@@ -46,14 +47,16 @@ class AnsatzOptimizer:
         jax array
             A jax array of length `(n//2)*depth` containing all of the ZZ parameters.
         """
-        
+
         # Ignore the initial state parameters at the front
-        circ_params = all_params[2*self.n:]
+        circ_params = all_params[2 * self.n :]
         # Reshape the parameter array into blocks of the appropriate length for the repeated circuit
         # Infer the number of repetitions, which is the first coordinate
-        reshaped_params = circ_params.reshape(-1, 7 * (self.n // 2) * self.depth_modulus)
+        reshaped_params = circ_params.reshape(
+            -1, 7 * (self.n // 2) * self.depth_modulus
+        )
         # In each row, the first (n // 2) * self.depth_modulus parameters correspond to ZZs
-        return reshaped_params[:,:(self.n // 2) * self.depth_modulus].flatten()
+        return reshaped_params[:, : (self.n // 2) * self.depth_modulus].flatten()
 
     def output_state(self, all_params):
         """Given a parameterized ansatz circuit and a target state, compute state
@@ -70,9 +73,9 @@ class AnsatzOptimizer:
         jax array
             The output state as an array of shape `[2] * n`.
         """
-        
-        product_params = all_params[:2*self.n]
-        circ_params = all_params[2*self.n:]
+
+        product_params = all_params[: 2 * self.n]
+        circ_params = all_params[2 * self.n :]
 
         initial_state = product_state(product_params)
         return self.ansatz_fn(circ_params, initial_state)
@@ -96,12 +99,12 @@ class AnsatzOptimizer:
         """
 
         output_state = self.output_state(all_params)
-        return -abs(jnp.vdot(target_state, output_state))**2
+        return -abs(jnp.vdot(target_state, output_state)) ** 2
 
     def fidelity_from_noise(self, all_params):
         """Given a parameterized ansatz circuit, compute an estimate of the multiplicative
         factor on fidelity due to noise
-        
+
         Parameters
         ----------
         all_params : jax array
@@ -136,12 +139,14 @@ class AnsatzOptimizer:
         real
             The loss for this target state.
         """
-        
-        return self.fidelity_from_noise(all_params) * self.loss(all_params, target_state)
+
+        return self.fidelity_from_noise(all_params) * self.loss(
+            all_params, target_state
+        )
 
     def num_params(self, depth):
         """The total number of continuous parameters in an ansatz circuit of the given depth.
-        
+
         Parameters
         ----------
         depth : int
@@ -153,18 +158,25 @@ class AnsatzOptimizer:
         int
             Number of ansatz parameters.
         """
-        
+
         if depth % self.depth_modulus != 0:
             raise Exception("depth must be an integer multiple of depth_modulus")
         # 2*n: initial product state parameters
         # 7*(n//2): ansatz circuit paramaters per layer of 2-qubit gates (1 for ZZ, 2*3 for U3)
         # There are depth many layers total
-        return 2*self.n + 7*(self.n//2)*depth
+        return 2 * self.n + 7 * (self.n // 2) * depth
 
-    def optimize(self, target_state, depth,
-                 method="L-BFGS-B", noisy=False, maxiter=2500, init_params=None):
+    def optimize(
+        self,
+        target_state,
+        depth,
+        method="L-BFGS-B",
+        noisy=False,
+        maxiter=2500,
+        init_params=None,
+    ):
         """Optimize the ansatz circuit with respect to the target state.
-        
+
         Parameters
         ----------
         target_state : jax array
@@ -189,8 +201,7 @@ class AnsatzOptimizer:
         scipy OptimizeResult
             The result of running the scipy optimization.
         """
-        
-        
+
         if depth % self.depth_modulus != 0:
             raise Exception("depth must be an integer multiple of depth_modulus")
 
@@ -199,24 +210,28 @@ class AnsatzOptimizer:
             init_params = np.random.normal(scale=0.2, size=self.num_params(depth))
         init_params = jnp.array(init_params)
         if init_params.shape != (self.num_params(depth),):
-            raise Exception("init_params must be a 1D array of length num_params(depth)")
-        
+            raise Exception(
+                "init_params must be a 1D array of length num_params(depth)"
+            )
+
         if noisy:
             value_and_grad = self.noisy_loss_and_grad
         else:
             value_and_grad = self.loss_and_grad
 
-        opt = scipy.optimize.minimize(value_and_grad,
-                                      init_params,
-                                      args=(target_state),
-                                      method=method,
-                                      jac=True,
-                                      options={"maxiter": maxiter})
+        opt = scipy.optimize.minimize(
+            value_and_grad,
+            init_params,
+            args=(target_state),
+            method=method,
+            jac=True,
+            options={"maxiter": maxiter},
+        )
         return opt
 
     def pytket_circuit(self, all_params):
         """Output a pytket circuit with the desired parameters.
-        
+
         Parameters
         ----------
         all_params : jax array
@@ -228,11 +243,11 @@ class AnsatzOptimizer:
         pytket Circuit
             The corresponding circuit.
         """
-        
+
         gates_per_mod, qubit_inds, param_inds, num_params_per_mod = self.modulus_gates
 
-        product_params = all_params[:2*self.n]
-        circ_params = all_params[2*self.n:]
+        product_params = all_params[: 2 * self.n]
+        circ_params = all_params[2 * self.n :]
 
         qc = Circuit(self.n)
 
@@ -259,7 +274,7 @@ class AnsatzOptimizer:
 
     def qiskit_circuit(self, all_params):
         """Output a qiskit circuit with the desired parameters.
-        
+
         Parameters
         ----------
         all_params : jax array
@@ -277,8 +292,8 @@ class AnsatzOptimizer:
 
         # Need to multiply by pi because qujax's conventions are different from qiskit's
         all_params = all_params * np.pi
-        product_params = all_params[:2*self.n]
-        circ_params = all_params[2*self.n:]
+        product_params = all_params[: 2 * self.n]
+        circ_params = all_params[2 * self.n :]
 
         qc = QuantumCircuit(self.n)
 

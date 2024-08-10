@@ -1,5 +1,5 @@
-from optimize_qujax import *
-from random_stabilizer import *
+from optimize.optimize_qujax import *
+from clifford_utils.random_stabilizer import *
 from pytket import Circuit
 from pytket.extensions.quantinuum import QuantinuumBackend, QuantinuumAPIOffline
 from pytket.extensions.quantinuum.backends.api_wrappers import QuantinuumAPI
@@ -12,7 +12,8 @@ from qujax.gates import *
 
 import time
 
-n = 6
+
+n = 4
 depth = 4
 start = time.time()
 online = True
@@ -40,11 +41,11 @@ state_prep_circ.add_barrier(qubits=list(range(n)))
 if online:
     backend = QuantinuumBackend(
         device_name="H1-1E",
-        api_handler=QuantinuumAPI(token_store=QuantinuumConfigCredentialStorage())
-        )
+        api_handler=QuantinuumAPI(token_store=QuantinuumConfigCredentialStorage()),
+    )
 else:
     api_offline = QuantinuumAPIOffline()
-    backend = QuantinuumBackend(device_name="H1-1LE", api_handler = api_offline)
+    backend = QuantinuumBackend(device_name="H1-1LE", api_handler=api_offline)
 backend.default_compilation_pass().apply(state_prep_circ)
 
 stab_gates = stabilizer_gate_list_ag(n)
@@ -89,7 +90,9 @@ for i in range(n_cliffords):
     overall_circ.measure_all()
 
     result = backend.run_circuit(overall_circ, n_shots=shots_per_clifford)
-    xeb_scores = list(abs(scoring_state[tuple(shot)])**2 * 2**n - 1 for shot in result.get_shots())
+    xeb_scores = list(
+        abs(scoring_state[tuple(shot)]) ** 2 * 2**n - 1 for shot in result.get_shots()
+    )
     observed_xeb = sum(xeb_scores) / len(xeb_scores)
     basis_xeb = sum(abs((scoring_state * cliff_output_state).flatten() ** 2)) * 2**n - 1
     print(f"Observed XEB: {observed_xeb}")

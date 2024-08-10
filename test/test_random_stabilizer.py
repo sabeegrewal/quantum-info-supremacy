@@ -1,6 +1,6 @@
 # Let's sanity check random stabilizer generation with qiskit
 
-from random_stabilizer import *
+from clifford_utils.random_stabilizer import *
 
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import StabilizerState
@@ -9,7 +9,7 @@ import time
 
 n = 3
 gate_list = stabilizer_gate_list_ag(n)
-stab_counts = {} # Will record counts of stabilizer tableaux
+stab_counts = {}  # Will record counts of stabilizer tableaux
 
 start = time.time()
 
@@ -33,7 +33,7 @@ for i in range(iters):
                 qc.cx(qubits[0], qubits[1])
     stab = StabilizerState(qc)
     # Extract the unsigned stabilizer tableau
-    tableau_unsigned = tuple(tuple(row) for row in stab.clifford.stab[:,:2*n])
+    tableau_unsigned = tuple(tuple(row) for row in stab.clifford.stab[:, : 2 * n])
     if tableau_unsigned in stab_counts:
         stab_counts[tableau_unsigned] += 1
     else:

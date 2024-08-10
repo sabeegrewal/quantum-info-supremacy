@@ -3,3 +3,6 @@ quimb
 matplotlib 
 jax
 qujax
+pytket
+pytket-quantinuum
+pytket-qiskit
