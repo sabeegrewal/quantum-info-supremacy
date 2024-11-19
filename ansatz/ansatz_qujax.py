@@ -179,5 +179,12 @@ def zzphase_fidelity(theta):
     theta = jnp.mod(theta, 1)
     # Then normalize to [0, 1/2), which is equivalent to conjugating one qubit by X if necessary
     theta = 1 / 2 - jnp.abs(theta - 1 / 2)
+    # Estimate of 2-qubit gate error rate
+    eps_tq = 0.00148 * theta + 0.00027
+    # Estimate of 1-qubit memory error rate
+    eps_mem = 8e-5
     # Finally compute a linear function
-    return 1 - (1.2 * theta + 0.4) * 0.0011
+    # The reason for the 5/4 and 3 is a (d+1)/d in going from average fidelity to process fidelity
+    # For 2-qubit gates d = 4, for 1-qubit gates d = 2
+    # Finally, we account for eps_mem twice, making 3/2 -> 3
+    return 1 - (5/4) * eps_tq - 3 * eps_mem
