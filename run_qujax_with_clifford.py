@@ -142,10 +142,10 @@ for i in range(n_cliffords):
             if job_status.status.name == 'COMPLETED':
                 print("Done!")
                 break
-            elif if job_status.status.name == 'ERROR':
+            elif job_status.status.name == 'ERROR':
                 print("ERROR")
                 break
-            elif if job_status.status.name == 'CANCELLED':
+            elif job_status.status.name == 'CANCELLED':
                 print("CANCELLED")
                 break
             else:
