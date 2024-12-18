@@ -8,6 +8,7 @@ from pytket.extensions.quantinuum.backends.credential_storage import (
     QuantinuumConfigCredentialStorage,
 )
 from pytket.extensions.quantinuum.backends.leakage_gadget import get_leakage_gadget_circuit
+from pytket.passes import SequencePass
 from pytket import Qubit, Bit
 
 from qujax.statetensor import apply_gate
