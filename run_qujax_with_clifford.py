@@ -111,7 +111,15 @@ for i in range(n_cliffords):
     overall_circ.add_barrier(overall_circ.qubits + overall_circ.bits)
     overall_circ.append(cliff_circ)
     overall_circ.measure_all()
-    backend.default_compilation_pass().apply(overall_circ)
+    # Use custom 
+    default_pass_list = backend.default_compilation_pass(optimisation_level=3).get_sequence()
+    my_pass_list = [
+        pas for pas in default_pass_list
+        if pas.to_dict()["StandardPass"]["name"] not in ["RemoveBarriers", "GreedyPauliSimp"]
+        ]
+    compilation_pass = SequencePass(my_pass_list)
+    compilation_pass.apply(overall_circ)
+    
 
     basis_xeb = sum(abs((scoring_state * cliff_output_state).flatten() ** 2)) * 2**n - 1
     print(f"Noiseless basis XEB: {basis_xeb}")
