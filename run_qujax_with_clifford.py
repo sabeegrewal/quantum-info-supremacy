@@ -17,13 +17,20 @@ from qujax.gates import *
 import time
 import json
 
+import numpy as np
+import random
+
+seed = 7
+np.random.seed(seed)
+random.seed(seed)
+
 n = 8
-depth = 10
+depth = 20
 start = time.time()
 online = True
 noisy = True
-detect_leakage = False
-submit_job = False
+detect_leakage = True
+submit_job = True
 
 optimizer = AnsatzOptimizer(n)
 target_state = np.random.normal(size=([2] * n)) + 1j * np.random.normal(size=([2] * n))
