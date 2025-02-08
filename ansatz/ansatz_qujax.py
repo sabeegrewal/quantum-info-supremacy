@@ -2,7 +2,6 @@ import jax
 import jax.numpy as jnp
 
 import qujax
-from qujax import print_circuit, repeat_circuit, all_zeros_statetensor
 
 # Based on https://github.com/CQCL/qujax/blob/main/examples/reducing_jit_compilation_time.ipynb
 
@@ -110,7 +109,7 @@ def make_brickwork_ansatz_fn(num_qubits, depth):
     params_to_statetensor = qujax.get_params_to_statetensor_func(
         gates, qubit_inds, param_inds
     )
-    return repeat_circuit(params_to_statetensor, num_params)
+    return qujax.repeat_circuit(params_to_statetensor, num_params)
 
 
 def state2(theta, phi):
