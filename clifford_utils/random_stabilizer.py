@@ -242,6 +242,25 @@ def random_stabilizer_toggles(n):
                 # leading_qubits.index(i) looks up the row corresponding to i
     return result
 
+def num_stab_gates_ag(n):
+    """Number of one- and two-qubit gates needed to synthesize a
+    stabilizer state of n qubits via the Aaronson-Gottesman method.
+    Equivalent to `len(stabilizer_gate_list_ag(n))`.
+
+    Parameters
+    ----------
+    n : int
+        Number of qubits in the stabilizer state.
+
+    Returns
+    -------
+    int
+        Number of gates in an n-qubit Aaronson-Gottesman circuit
+        for stabilizer preparation.
+    """
+
+    return n * (n - 1) // 2 + n * 4
+
 def stabilizer_gate_list_ag(n):
     """The list of gates that can be toggled on/off to synthesize
     a generic stabilizer state in Aaronson-Gottesman form. This
