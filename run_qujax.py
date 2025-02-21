@@ -2,16 +2,16 @@ from optimize.optimize_qujax import *
 import qiskit
 from pytket.extensions.quantinuum import QuantinuumBackend, QuantinuumAPIOffline
 
-n = 4
+n = 12
 optimizer = AnsatzOptimizer(n)
 
 import matplotlib.pyplot as plt
 import time
 
 print(time.time())
-for depth in range(104, 105, 1):
+for depth in range(80, 81, 1):
     all_two_qubit_params = []
-    for i in range(1):
+    for i in range(10):
         init_params = np.random.normal(size=optimizer.num_params(depth), scale=1.0)
 
         target_state = np.random.normal(size=([2] * n)) + 1j * np.random.normal(
@@ -22,8 +22,16 @@ for depth in range(104, 105, 1):
         opt = optimizer.optimize(target_state, depth, noisy=True)
         print((depth, opt.fun))
         all_two_qubit_params.append(optimizer.zzphase_params(opt.x))
-    # plt.hist(jnp.array(all_two_qubit_params).flatten(), bins=50)
-    # plt.show()
+    par = jnp.array(all_two_qubit_params).flatten()
+    par = jnp.mod(par, 1)
+    par = 1 / 2 - jnp.abs(par - 1 / 2)
+    plt.hist(par, bins=50)
+    plt.show()
+
+    file = open(f"n_{n}_depth_{depth}_two_qubit_params.txt", "w")
+    for p in par:
+        file.write(str(p) + "\n")
+    file.close()
 print(time.time())
 
 x = opt.x
