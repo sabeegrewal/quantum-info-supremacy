@@ -128,10 +128,10 @@ def state2(theta, phi):
 
     # Matching the conventions of qujax: https://cqcl.github.io/qujax/gates.html
     # Also matches Quantinuum: https://tket.quantinuum.com/api-docs/optype.html
-    pitheta_2 = jnp.pi * theta / 2
+    pitheta_2 = (jnp.pi / 2) * theta
     cpt2 = jnp.cos(pitheta_2)
     spt2 = jnp.sin(pitheta_2)
-    eipp = jnp.exp(1j * jnp.pi * phi)
+    eipp = jnp.exp((jnp.pi * 1j) * phi)
     return jnp.array([cpt2, eipp * spt2])
 
 
