@@ -17,8 +17,8 @@ def u3(theta, phi, lamda):
     """
 
     theta_2 = theta / 2
-    ct2 = jnp.cos(theta / 2)
-    st2 = jnp.sin(theta / 2)
+    ct2 = jnp.cos(theta_2)
+    st2 = jnp.sin(theta_2)
     eil = jnp.exp(1j * lamda)
     eip = jnp.exp(1j * phi)
     # See https://docs.quantum.ibm.com/api/qiskit/qiskit.circuit.library.U3Gate
@@ -39,7 +39,7 @@ def rzz(theta):
         The RZZ gate parametrized by theta as a jax array of shape (4, 4).
     """
 
-    eit2 = jnp.exp(-1j * theta / 2)
+    eit2 = jnp.exp(-0.5j * theta)
     eit2c = eit2.conj()
     # See https://docs.quantum.ibm.com/api/qiskit/qiskit.circuit.library.RZZGate
     return jnp.diag(jnp.array([eit2, eit2c, eit2c, eit2]))
