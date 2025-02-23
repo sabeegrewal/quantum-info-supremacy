@@ -248,7 +248,7 @@ def load_result_handle(filename):
 
     return (n, depth, online, noisy, detect_leakage, toggles, target_state, scoring_state, cliff_output_state, overall_circ, result_handle)
 
-def await_job(backend, result_handle, skeep=20, trials=1000):
+def await_job(backend, result_handle, sleep=20, trials=1000):
     """Load the data that was saved using `save_result_handle`.
 
     Parameters
@@ -284,7 +284,7 @@ def await_job(backend, result_handle, skeep=20, trials=1000):
             break
         else:
             print("Waiting...")
-        time.sleep(20)
+        time.sleep(sleep)
     return result
 
 def print_results(scoring_state, detect_leakage, result):
