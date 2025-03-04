@@ -322,61 +322,60 @@ def print_results(scoring_state, detect_leakage, result):
     observed_xeb = sum(xeb_scores) / len(xeb_scores)
     pruned_xeb = sum(pruned_xeb_scores) / len(pruned_xeb_scores)
     
-    print(f"Observed XEB: {observed_xeb}")
-    print(f"Observed pruned XEB: {pruned_xeb}")
+    print(f"Observed XEB: {observed_xeb} with std {np.std(xeb_scores)}")
+    print(f"Observed pruned XEB: {pruned_xeb} with std {np.std(pruned_xeb_scores)}")
 
-n = 12
-depth = 84
-online = True
-noisy = True
-detect_leakage = False # Toggle to enable leakage
-submit_job = True
+def run(detect_leakage, num_leakage_qubits):
+    n = 12
+    depth = 84
+    online = True
+    noisy = True
+    submit_job = True
 
-seed = 0
-print(f"seed {seed}")
-np.random.seed(seed)
-random.seed(seed)
+    seed = 0
+    print(f"seed {seed}")
+    np.random.seed(seed)
+    random.seed(seed)
 
-start = time.time()
+    start = time.time()
 
-target_state = np.random.normal(size=([2] * n)) + 1j * np.random.normal(size=([2] * n))
-target_state = target_state / np.linalg.norm(target_state)
-# TODO technically we don't need to normalize
+    target_state = np.random.normal(size=([2] * n)) + 1j * np.random.normal(size=([2] * n))
+    target_state = target_state / np.linalg.norm(target_state)
+    # TODO technically we don't need to normalize
 
-optimizer = AnsatzOptimizer(n)
-opt = optimizer.optimize(target_state, depth, noisy=noisy, maxiter=20000)
-output_state = optimizer.output_state(opt.x)
-noiseless_fidelity = -optimizer.loss(opt.x, target_state)
-fidelity_from_noise = optimizer.fidelity_from_noise(opt.x)
-print(f"Noiseless fidelity: {noiseless_fidelity}")
-print(f"Estimated fidelity due to noise: {fidelity_from_noise}")
-print(f"Estimated overall fidelity: {fidelity_from_noise * noiseless_fidelity}")
-print(f"Optimization time: {time.time() - start}")
-print("")
+    optimizer = AnsatzOptimizer(n)
+    opt = optimizer.optimize(target_state, depth, noisy=noisy, maxiter=20000)
+    output_state = optimizer.output_state(opt.x)
+    noiseless_fidelity = -optimizer.loss(opt.x, target_state)
+    fidelity_from_noise = optimizer.fidelity_from_noise(opt.x)
+    print(f"Noiseless fidelity: {noiseless_fidelity}")
+    print(f"Estimated fidelity due to noise: {fidelity_from_noise}")
+    print(f"Estimated overall fidelity: {fidelity_from_noise * noiseless_fidelity}")
+    print(f"Optimization time: {time.time() - start}")
+    print("")
 
-opt_params = opt.x
-state_prep_circ = optimizer.pytket_circuit(opt_params)
+    opt_params = opt.x
+    state_prep_circ = optimizer.pytket_circuit(opt_params)
 
-if online:
-    backend = QuantinuumBackend(
-        device_name="H1-1",
-        api_handler=QuantinuumAPI(),
-    )
-else:
-    api_offline = QuantinuumAPIOffline()
-    backend = QuantinuumBackend(device_name="H1-1LE", api_handler=api_offline)
+    if online:
+        backend = QuantinuumBackend(
+            device_name="H1-1",
+            api_handler=QuantinuumAPI(),
+        )
+    else:
+        api_offline = QuantinuumAPIOffline()
+        backend = QuantinuumBackend(device_name="H1-1LE", api_handler=api_offline)
 
-toggles, cliff_circ, scoring_state, cliff_output_state = make_and_apply_cliff(target_state, output_state)
-overall_circ = make_overall_circ(state_prep_circ, cliff_circ, backend, detect_leakage)            
+    toggles, cliff_circ, scoring_state, cliff_output_state = make_and_apply_cliff(target_state, output_state)
+    overall_circ = make_overall_circ(state_prep_circ, cliff_circ, backend, detect_leakage, num_leakage_qubits)            
 
-basis_xeb = sum(abs((scoring_state * cliff_output_state).flatten() ** 2)) * 2**n - 1
-print(f"Noiseless basis XEB: {basis_xeb}")
-print(f"Est. noisy basis XEB: {basis_xeb * fidelity_from_noise}")
+    basis_xeb = sum(abs((scoring_state * cliff_output_state).flatten() ** 2)) * 2**n - 1
+    print(f"Noiseless basis XEB: {basis_xeb}")
+    print(f"Est. noisy basis XEB: {basis_xeb * fidelity_from_noise}")
 
-if submit_job:
-    result_handle = backend.process_circuit(overall_circ, n_shots=1000)
-    save_result_handle(n, depth, online, noisy, detect_leakage, toggles, target_state, scoring_state,
-                       cliff_output_state, overall_circ, result_handle)
-    result = await_job(backend, result_handle)
-    print_results(scoring_state, detect_leakage, result)
-    
+    if submit_job:
+        result_handle = backend.process_circuit(overall_circ, n_shots=1000)
+        save_result_handle(n, depth, online, noisy, detect_leakage, toggles, target_state, scoring_state,
+                           cliff_output_state, overall_circ, result_handle)
+        result = await_job(backend, result_handle)
+        print_results(scoring_state, detect_leakage, result)
