@@ -132,7 +132,7 @@ def apply_circuit(depth, initial_state, params):
     Returns
     -------
     jax array
-        The output of the ansatz circuit applied to the given state.
+        The output state as an array of shape `[2] * n`.
     """
 
     # Infer the number of qubits
