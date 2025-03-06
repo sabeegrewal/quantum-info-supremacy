@@ -259,30 +259,42 @@ class AnsatzOptimizer:
         )
         return opt
 
-    def pytket_circuit(self, all_params):
-        """Output a pytket circuit with the desired parameters.
+    def circuit(self, all_params, method):
+        """Output a pytket or qiskit circuit with the desired parameters.
 
         Parameters
         ----------
         all_params : jax array
             Parameters for the ansatz circuit.
             Must have length `num_params(depth)` for some `depth` dividing `depth_modulus`.
+        method : str
+            One of "pytket" or "qiskit".
 
         Returns
         -------
-        pytket Circuit
+        pytket Circuit or qiskit QuantumCircuit
             The corresponding circuit.
         """
+
+        if method == "pytket":
+            qc = Circuit(self.n)
+        elif method == "qiskit":
+            # Need to multiply by pi because pytket's conventions are different from qiskit's
+            all_params = all_params * np.pi
+            qc = QuantumCircuit(self.n)
+        else:
+            raise Exception("Unsupported circuit method: " + method)
 
         product_params = all_params[: 2 * self.n]
         circ_params = all_params[2 * self.n :]
 
-        qc = Circuit(self.n)
-
         product_params_reshaped = product_params.reshape(self.n, 2)
         for i in range(self.n):
             theta, phi = product_params_reshaped[i]
-            qc.U3(theta, phi, 0, i)
+            if method == "pytket":
+                qc.U3(theta, phi, 0, i)
+            else:
+                qc.u(theta, phi, 0, i)
 
         circ_params_reshaped = circ_params.reshape(-1, self.num_params_per_mod)
         for iter_circ_params in circ_params_reshaped:
@@ -299,64 +311,19 @@ class AnsatzOptimizer:
 
                 # Apply 2- and 1-qubit gates to each pair
                 for i, j in pairs:
-                    # RZZ gate to apply
-                    qc.ZZPhase(iter_circ_params[rzz_off], i, j)
+                    if method == "pytket":
+                        # RZZ gate to apply
+                        qc.ZZPhase(iter_circ_params[rzz_off], i, j)
+                        # U3 gates to apply
+                        qc.U3(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
+                        qc.U3(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
+                    else:
+                        # RZZ gate to apply
+                        qc.rzz(iter_circ_params[rzz_off], i, j)
+                        # U3 gates to apply
+                        qc.u(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
+                        qc.u(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
                     rzz_off += 1
-                    # U3 gates to apply
-                    qc.U3(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
-                    qc.U3(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
-                    u3_off += 6
-                    
-        return qc
-
-    def qiskit_circuit(self, all_params):
-        """Output a qiskit circuit with the desired parameters.
-
-        Parameters
-        ----------
-        all_params : jax array
-            Parameters for the ansatz circuit.
-            Must have length `num_params(depth)` for some `depth` dividing `depth_modulus`.
-
-        Returns
-        -------
-        qiskit QuantumCircuit
-            The corresponding circuit.
-        """
-
-        # Need to multiply by pi because qujax's conventions are different from qiskit's
-        all_params = all_params * np.pi
-        product_params = all_params[: 2 * self.n]
-        circ_params = all_params[2 * self.n :]
-
-        qc = QuantumCircuit(self.n)
-
-        product_params_reshaped = product_params.reshape(self.n, 2)
-        for i in range(self.n):
-            theta, phi = product_params_reshaped[i]
-            qc.u(theta, phi, 0, i)
-
-        circ_params_reshaped = circ_params.reshape(-1, self.num_params_per_mod)
-        for iter_circ_params in circ_params_reshaped:
-            # Number of parameters in RZZ gates
-            num_rzz_params = (self.n // 2) * self.depth_modulus
-
-            # Offsets into the parameter array
-            rzz_off = 0
-            u3_off = num_rzz_params
-
-            for layer in range(self.depth_modulus):
-                # First identify the paired qubits
-                pairs = brickwork_pairs(self.n, layer)
-
-                # Apply 2- and 1-qubit gates to each pair
-                for i, j in pairs:
-                    # RZZ gate to apply
-                    qc.rzz(iter_circ_params[rzz_off], i, j)
-                    rzz_off += 1
-                    # U3 gates to apply
-                    qc.u(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
-                    qc.u(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
                     u3_off += 6
                     
         return qc
