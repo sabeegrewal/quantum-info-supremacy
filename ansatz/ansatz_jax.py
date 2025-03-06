@@ -1,6 +1,31 @@
 import jax
 import jax.numpy as jnp
 
+# ----------------
+# Gates and states
+# ----------------
+
+def state2(theta, phi):
+    """Arbitrary one-qubit state with two real parameters.
+
+    Parameters
+    ----------
+    theta : real
+    phi  : real
+
+    Returns
+    -------
+    jax array
+        The one-qubit state equivalent to U3(theta, phi, _)|0> as a jax array of shape `(2)`.
+    """
+
+    # Matching the convention of Quantinuum: https://tket.quantinuum.com/api-docs/optype.html
+    pitheta_2 = (jnp.pi / 2) * theta
+    cpt2 = jnp.cos(pitheta_2)
+    spt2 = jnp.sin(pitheta_2)
+    eipp = jnp.exp((jnp.pi * 1j) * phi)
+    return jnp.array([cpt2, eipp * spt2])
+
 def u3(theta, phi, lamda):
     """Arbitrary one-qubit gate with three real parameters.
 
@@ -44,13 +69,40 @@ def rzz(theta):
     # See https://docs.quantinuum.com/tket/api-docs/optype.html
     return jnp.diag(jnp.array([eipt2, eipt2c, eipt2c, eipt2]))
 
+
+
+# -------------------
+# Circuit application
+# -------------------
+
+def product_state(params):
+    """Arbitrary product state with given parameters.
+
+    Parameters
+    ----------
+    params : jax array
+        Should have shape `(2 * n)` for some `n`.
+
+    Returns
+    -------
+    jax array
+        The corresponding product state as a jax array of shape `[2] * n`.
+    """
+
+    # Infer the first dimension, which is the number of qubits
+    params = params.reshape(-1, 2)
+    result = 1
+    for theta, phi in params:
+        result = jnp.tensordot(result, state2(theta, phi), axes=[[], []])
+    return result
+
 def apply_two_qubit(state, gate, i, j):
     """Apply a 2-qubit gate.
 
     Parameters
     ----------
     state : jax array
-        Should have shape `[2] * n` for some `n > j`.
+        Should have shape `[2] * n` for some `n > max(i, j)`.
     gate : jax array
         A 2-qubit gate as a jax array of shape (2, 2, 2, 2).
     i : int
@@ -92,27 +144,6 @@ def brickwork_pairs(num_qubits, layer):
         ((layer + i) % num_qubits, (layer + i + 1) % num_qubits)
         for i in range(0, num_qubits - 1, 2)
     ]
-
-def state2(theta, phi):
-    """Arbitrary one-qubit state with two real parameters.
-
-    Parameters
-    ----------
-    theta : real
-    phi  : real
-
-    Returns
-    -------
-    jax array
-        The one-qubit state equivalent to U3(theta, phi, _)|0> as a jax array of shape `(2)`.
-    """
-
-    # Matching the convention of Quantinuum: https://tket.quantinuum.com/api-docs/optype.html
-    pitheta_2 = (jnp.pi / 2) * theta
-    cpt2 = jnp.cos(pitheta_2)
-    spt2 = jnp.sin(pitheta_2)
-    eipp = jnp.exp((jnp.pi * 1j) * phi)
-    return jnp.array([cpt2, eipp * spt2])
 
 def apply_circuit(depth, initial_state, params):
     """Apply a 1D ansatz circuit with given parameters to the initial state.
@@ -170,27 +201,6 @@ def apply_circuit(depth, initial_state, params):
             state = apply_two_qubit(state, gate_tensor, i, j)
             
     return state
-
-def product_state(params):
-    """Arbitrary product state with given parameters.
-
-    Parameters
-    ----------
-    params : jax array
-        Should have shape `(2 * n)` for some `n`.
-
-    Returns
-    -------
-    jax array
-        The corresponding product state as a jax array of shape `[2] * n`.
-    """
-
-    # Infer the first dimension, which is the number of qubits
-    params = params.reshape(-1, 2)
-    result = 1
-    for theta, phi in params:
-        result = jnp.tensordot(result, state2(theta, phi), axes=[[], []])
-    return result
 
 def zzphase_fidelity(theta):
     """Approximate fidelity with which we can implement a ZZ gate with given parameter.
