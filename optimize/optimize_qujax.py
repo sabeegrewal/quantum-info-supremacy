@@ -172,7 +172,7 @@ class AnsatzOptimizer:
         depth,
         method="L-BFGS-B",
         noisy=False,
-        maxiter=2500,
+        maxiter=10000,
         init_params=None,
     ):
         """Optimize the ansatz circuit with respect to the target state.
