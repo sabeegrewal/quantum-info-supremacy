@@ -4,5 +4,5 @@ matplotlib
 jax
 qujax
 pytket
-pytket-quantinuum
+pytket-quantinuum[pecos]
 pytket-qiskit
