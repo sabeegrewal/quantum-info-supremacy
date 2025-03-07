@@ -323,7 +323,7 @@ def output_state(num_qubits, all_params):
         Number of qubits in the circuit.
     all_params : jax array
         Parameters for the ansatz circuit.
-        Should have length `2 * num_qubits + num_params(depth)`
+        Should have length `2 * num_qubits + num_gate_params(num_qubits, depth)`
         for some `depth` divisible by `depth_modulus(num_qubits)`.
         The first `2 * num_qubits` parameters specify the initial product state,
         and the rest specify the gates in the circuit.
@@ -350,7 +350,7 @@ def make_circuit(num_qubits, all_params, method):
         Number of qubits in the circuit.
     all_params : jax array
         Parameters for the ansatz circuit.
-        Should have length `2 * num_qubits + num_params(depth)`
+        Should have length `2 * num_qubits + num_gate_params(num_qubits, depth)`
         for some `depth` divisible by `depth_modulus(num_qubits)`.
         The first `2 * num_qubits` parameters specify the initial product state,
         and the rest specify the gates in the circuit.
