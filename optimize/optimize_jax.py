@@ -47,25 +47,26 @@ def zzphase_params(num_qubits, all_params):
 
     Parameters
     ----------
+    num_qubits : int
+        Number of qubits in the circuit.
     all_params : jax array
         Parameters for the ansatz circuit.
-        Should have length `n*2 + 7*(n//2)*depth` for some `depth` dividing `depth_modulus`.
+        Should have length `2 * num_qubits + num_gate_params(num_qubits, depth)`
+        for some `depth` divisible by `depth_modulus(num_qubits)`.
 
     Returns
     -------
     jax array
-        A jax array of length `(n//2)*depth` containing all of the ZZ parameters.
+        A jax array of length `(num_qubits//2)*depth` containing all of the ZZ parameters.
     """
-
-    mod = depth_modulus(num_qubits)
-    num_params_per_mod = num_gate_params(num_qubits, mod)
     
     # Ignore the initial state parameters at the front
     circ_params = all_params[2*num_qubits:]
     # Reshape the parameter array into blocks of the appropriate length for the repeated circuit
-    # Infer the number of repetitions, which is the first coordinate
-    reshaped_params = circ_params.reshape(-1, num_params_per_mod)
-    # In each row, the first (n // 2) * depth_modulus parameters correspond to ZZs
+    reshaped_params = reshape_params_by_mod(num_qubits, circ_params)
+
+    mod = depth_modulus(num_qubits)
+    # In each row, the first (n // 2) * mod parameters correspond to ZZs
     return reshaped_params[:, : (num_qubits // 2) * mod].flatten()
 
 def fidelity_from_noise(num_qubits, all_params):
@@ -74,9 +75,12 @@ def fidelity_from_noise(num_qubits, all_params):
 
     Parameters
     ----------
+    num_qubits : int
+        Number of qubits in the circuit.
     all_params : jax array
         Parameters for the ansatz circuit.
-        Should have length `n*2 + 7*(n//2)*depth` for some `depth` dividing `depth_modulus`.
+        Should have length `2 * num_qubits + num_gate_params(num_qubits, depth)`
+        for some `depth` divisible by `depth_modulus(num_qubits)`.
 
     Returns
     -------
@@ -102,7 +106,8 @@ def loss(all_params, target_state):
     ----------
     all_params : jax array
         Parameters for the ansatz circuit.
-        Should have length `num_params(depth)` for some `depth` divisible by `depth_modulus`.
+        Should have length `2 * n + num_gate_params(n, depth)`
+        for some `n` and `depth` divisible by `depth_modulus(n)`.
     target_state : jax array
         The target state. Should have shape `[2] * n`.
 
@@ -125,7 +130,8 @@ def noisy_loss(all_params, target_state):
     ----------
     all_params : jax array
         Parameters for the ansatz circuit.
-        Should have length `n*2 + 7*(n//2)*depth` for some `depth` dividing `depth_modulus`.
+        Should have length `2 * n + num_gate_params(n, depth)`
+        for some `n` and `depth` divisible by `depth_modulus(n)`.
     target_state : jax array
         The target state. Should have shape `[2] * n`.
 
@@ -138,6 +144,7 @@ def noisy_loss(all_params, target_state):
     num_qubits = len(target_state.shape)
     return fidelity_from_noise(num_qubits, all_params) * loss(all_params, target_state)
 
+# jit-compiled functions computing loss and gradient simultaneously
 loss_and_grad = jax.jit(jax.value_and_grad(loss))
 noisy_loss_and_grad = jax.jit(jax.value_and_grad(noisy_loss))
 
@@ -160,20 +167,20 @@ def optimize(
     Parameters
     ----------
     target_state : jax array
-        The target state. Should have shape `[2] * n`.
+        The target state. Should have shape `[2] * n` for some `n`.
     depth : int
         Depth of the ansatz circuit, as measured by the number of two-qubit ZZ layers.
-        Must be divisible by `depth_modulus`.
+        Must be divisible by `depth_modulus(n)`.
     method : str
         Scipy optimizer method to use. Defaults to `"L-BFGS-B"`.
     noisy : bool
         Whether to optimize the loss function accounting for experimental noise.
         Defaults to `False`.
     maxiter : int
-        Maximum number of iterations for the optimizer. Defaults to `2500`.
+        Maximum number of iterations for the optimizer. Defaults to `10000`.
     init_params : jax_array or None
         If provided, the initial parameters for the ansatz circuit.
-        Must have length `num_params(depth)`.
+        Must have length `2 * n + num_gate_params(n, depth)`.
         If `None`, the initial parameters are chosen randomly.
 
     Returns
