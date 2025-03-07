@@ -1,6 +1,9 @@
 import jax
 import jax.numpy as jnp
 
+from pytket import Circuit
+from qiskit import QuantumCircuit
+
 # ----------------
 # Gates and states
 # ----------------
@@ -71,9 +74,9 @@ def rzz(theta):
 
 
 
-# -------------------
-# Circuit application
-# -------------------
+# ----------------
+# Gate application
+# ----------------
 
 def product_state(params):
     """Arbitrary product state with given parameters.
@@ -125,6 +128,11 @@ def apply_two_qubit(state, gate, i, j):
     return jnp.einsum(einsum_str, state, gate)
 
 
+
+# -------------------
+# 1D brickwork ansatz
+# -------------------
+
 def brickwork_pairs(num_qubits, layer):
     """Which qubits to pair in a 1D cyclic brickwork circuit.
 
@@ -144,6 +152,44 @@ def brickwork_pairs(num_qubits, layer):
         ((layer + i) % num_qubits, (layer + i + 1) % num_qubits)
         for i in range(0, num_qubits - 1, 2)
     ]
+
+def depth_modulus(num_qubits):
+    """The period at which `brickwork_pairs` repeats.
+
+    Parameters
+    ----------
+    num_qubits : int
+        Number of qubits in the circuit.
+        
+    Returns
+    -------
+    int
+        2 if `num_qubits` is even, otherwise `num_qubits`.
+    """
+    
+    if num_qubits % 2 == 0:
+        return 2
+    else:
+        return num_qubits
+
+def num_gate_params(num_qubits, depth):
+    """The number of gate parameters in a 1D brickwork
+    ansatz circuit of the given depth.
+
+    Parameters
+    ----------
+    num_qubits : int
+        Number of qubits in the circuit.
+    depth : int
+        Depth of the ansatz circuit, as measured by number of two-qubit layers.
+        
+    Returns
+    -------
+    int
+        `depth * (num_qubits // 2) * 7`
+    """
+    
+    return depth * (num_qubits // 2) * 7
 
 def apply_circuit(depth, initial_state, params):
     """Apply a 1D ansatz circuit with given parameters to the initial state.
@@ -202,33 +248,138 @@ def apply_circuit(depth, initial_state, params):
             
     return state
 
-def zzphase_fidelity(theta):
-    """Approximate fidelity with which we can implement a ZZ gate with given parameter.
+def reshape_params_by_mod(num_qubits, circ_params):
+    mod = depth_modulus(num_qubits)
+    num_params_per_mod = num_gate_params(num_qubits, mod)
+    return circ_params.reshape(-1, num_params_per_mod)
+
+def apply_circuit_repeated(initial_state, circ_params):
+    """Apply `apply_circuit` to the initial state as many times as possible.
+    This is a helper method to reduce jit compilation time in jax.
 
     Parameters
     ----------
-    theta : real or array
-        If given an array of thetas, this method returns the array of corresponding fidelities.
+    initial_state : jax array
+        Quantum state to apply the circuit to.
+        Should have shape `[2] * n` for some `n`.
+    params : jax array
+        List of real parameters that define the ansatz circuit.
+        Should have length `(n // 2) * depth * 7 * k` for some integer `k`.
 
     Returns
     -------
-    real or array
-        The fidelity (or fidelities) corresponding to theta.
+    jax array
+    The output state as an array of shape `[2] * n`.
     """
 
-    # In qujax, the maximally entangling ZZ gate has theta = 0.5;
-    # See https://cqcl.github.io/qujax/gates.html
+    num_qubits = len(initial_state.shape)
+    mod = depth_modulus(num_qubits)
+    
+    # Reshape the parameter array into blocks of the appropriate length for the repeated circuit
+    # Infer the number of repetitions, which is the first coordinate
+    reshaped_params = reshape_params_by_mod(num_qubits, circ_params)
 
-    # First normalize theta to [0, 1), which is equivalent to applying Z gates after if necessary
-    theta = jnp.mod(theta, 1)
-    # Then normalize to [0, 1/2), which is equivalent to conjugating one qubit by X if necessary
-    theta = 1 / 2 - jnp.abs(theta - 1 / 2)
-    # Estimate of 2-qubit gate error rate
-    eps_tq = 0.00148 * theta + 0.00027
-    # Estimate of 1-qubit memory error rate
-    eps_mem = 8e-5
-    # Finally compute a linear function
-    # The reason for the 5/4 and 3 is a (d+1)/d in going from average fidelity to process fidelity
-    # For 2-qubit gates d = 4, for 1-qubit gates d = 2
-    # Finally, we account for eps_mem twice, making 3/2 -> 3
-    return 1 - (5/4) * eps_tq - 3 * eps_mem
+    # Helper function used to apply a single round of gates of length depth_modulus
+    def f(state, p):
+        return apply_circuit(mod, state, p), None
+
+    # Use jax.lax.scan to improve compilation time, instead of unrolling the entire for-loop
+    # Inspiration taken from qujax:
+    # https://github.com/CQCL/qujax/blob/0a69ced74084301e087ad02429c47a54044ad6ae/qujax/utils.py#L496
+    result, _ = jax.lax.scan(f, initial_state, reshaped_params)
+    return result
+
+def output_state(num_qubits, all_params):
+    """Given a parameterized ansatz circuit and a target state, compute state
+    output by the circuit.
+
+    Parameters
+    ----------
+    num_qubits : int
+        Number of qubits in the circuit.
+    all_params : jax array
+        Parameters for the ansatz circuit.
+        Should have length `num_params(depth)` for some `depth` divisible by `depth_modulus`.
+
+    Returns
+    -------
+    jax array
+        The output state as an array of shape `[2] * n`.
+    """
+
+    product_params = all_params[:2*num_qubits]
+    circ_params = all_params[2*num_qubits:]
+
+    initial_state = product_state(product_params)
+    return apply_circuit_repeated(initial_state, circ_params)
+
+def make_circuit(num_qubits, all_params, method):
+    """Convert the ansatz parameters into a pytket or qiskit circuit.
+
+    Parameters
+    ----------
+    all_params : jax array
+        Parameters for the ansatz circuit.
+        Must have length `num_params(depth)` for some `depth` dividing `depth_modulus`.
+    method : str
+        One of "pytket" or "qiskit".
+
+    Returns
+    -------
+    pytket Circuit or qiskit QuantumCircuit
+        The corresponding circuit.
+    """
+
+    if method == "pytket":
+        qc = Circuit(num_qubits)
+    elif method == "qiskit":
+        # Need to multiply by pi because pytket's conventions are different from qiskit's
+        all_params = all_params * jnp.pi
+        qc = QuantumCircuit(num_qubits)
+    else:
+        raise Exception("Unsupported circuit method: " + method)
+
+    product_params = all_params[: 2 * num_qubits]
+    circ_params = all_params[2 * num_qubits :]
+
+    product_params_reshaped = product_params.reshape(num_qubits, 2)
+    for i in range(num_qubits):
+        theta, phi = product_params_reshaped[i]
+        if method == "pytket":
+            qc.U3(theta, phi, 0, i)
+        else:
+            qc.u(theta, phi, 0, i)
+
+    mod = depth_modulus(num_qubits)
+    circ_params_reshaped = reshape_params_by_mod(num_qubits, circ_params)
+    for iter_circ_params in circ_params_reshaped:
+        # Number of parameters in RZZ gates
+        num_rzz_params = (num_qubits // 2) * mod
+
+        # Offsets into the parameter array
+        rzz_off = 0
+        u3_off = num_rzz_params
+
+        for layer in range(mod):
+            # First identify the paired qubits
+            pairs = brickwork_pairs(num_qubits, layer)
+
+            # Apply 2- and 1-qubit gates to each pair
+            for i, j in pairs:
+                if method == "pytket":
+                    # RZZ gate to apply
+                    qc.ZZPhase(iter_circ_params[rzz_off], i, j)
+                    # U3 gates to apply
+                    qc.U3(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
+                    qc.U3(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
+                else:
+                    # RZZ gate to apply
+                    qc.rzz(iter_circ_params[rzz_off], i, j)
+                    # U3 gates to apply
+                    qc.u(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
+                    qc.u(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
+                rzz_off += 1
+                u3_off += 6
+                
+    return qc
+
