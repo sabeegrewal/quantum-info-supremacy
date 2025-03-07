@@ -78,13 +78,13 @@ def rzz(theta):
 # Gate application
 # ----------------
 
-def product_state(params):
+def product_state(product_params):
     """Arbitrary product state with given parameters.
 
     Parameters
     ----------
-    params : jax array
-        Should have shape `(2 * n)` for some `n`.
+    product_params : jax array
+        Should have length `2 * n` for some `n`.
 
     Returns
     -------
@@ -93,9 +93,9 @@ def product_state(params):
     """
 
     # Infer the first dimension, which is the number of qubits
-    params = params.reshape(-1, 2)
+    product_params = product_params.reshape(-1, 2)
     result = 1
-    for theta, phi in params:
+    for theta, phi in product_params:
         result = jnp.tensordot(result, state2(theta, phi), axes=[[], []])
     return result
 
@@ -119,12 +119,13 @@ def apply_two_qubit(state, gate, i, j):
     """
 
     # Names for indices into the state tensor
-    indices = "abcdefghijklmnopqrstuvwxyz"[:len(state.shape)]
-    # Replace names at locations i and j with "y" and "z", respectively
-    new_indices = indices[:i] + "y" + indices[i+1:]
-    new_indices = new_indices[:j] + "z" + new_indices[j+1:]
-    # Contract indices[i] and indices[j], replacing with "y" and "z", respectively
-    einsum_str = indices + ",yz" + indices[i] + indices[j] + "->" + new_indices
+    # Technically, this restricts us to at most 50 qubits...
+    indices = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX"[:len(state.shape)]
+    # Replace names at locations i and j with "Y" and "Z", respectively
+    new_indices = indices[:i] + "Y" + indices[i+1:]
+    new_indices = new_indices[:j] + "Z" + new_indices[j+1:]
+    # Contract indices[i] and indices[j], replacing with "Y" and "Z", respectively
+    einsum_str = indices + ",YZ" + indices[i] + indices[j] + "->" + new_indices
     return jnp.einsum(einsum_str, state, gate)
 
 
@@ -154,7 +155,7 @@ def brickwork_pairs(num_qubits, layer):
     ]
 
 def depth_modulus(num_qubits):
-    """The period at which `brickwork_pairs` repeats.
+    """The period at which the set of `brickwork_pairs` repeats.
 
     Parameters
     ----------
@@ -173,8 +174,8 @@ def depth_modulus(num_qubits):
         return num_qubits
 
 def num_gate_params(num_qubits, depth):
-    """The number of gate parameters in a 1D brickwork
-    ansatz circuit of the given depth.
+    """The number of gate parameters in a 1D brickwork ansatz circuit of the given depth,
+    with alternating U3 and RZZ gates.
 
     Parameters
     ----------
@@ -188,23 +189,25 @@ def num_gate_params(num_qubits, depth):
     int
         `depth * (num_qubits // 2) * 7`
     """
-    
+
+    # There are (num_qubits // 2) RZZ gates per layer
+    # For each RZZ gate, there are 2 U3 gates
+    # RZZ gates have 1 parameter, U3 hates have 3
+    # Hence (num_qubits // 2) * 7 parameters per layer
     return depth * (num_qubits // 2) * 7
 
-def apply_circuit(depth, initial_state, params):
+def apply_circuit(initial_state, circ_params):
     """Apply a 1D ansatz circuit with given parameters to the initial state.
     This is for a 1D cyclic brickwork architecture with alternating U3 and RZZ gates.
 
     Parameters
     ----------
-    depth : int
-        Depth of the ansatz circuit, as measured by number of two-qubit layers.
     initial_state : jax array
         Quantum state to apply the circuit to.
         Should have shape `[2] * n` for some `n`.
-    params : jax array
+    circ_params : jax array
         List of real parameters that define the ansatz circuit.
-        Should have length `(n // 2) * depth * 7`.
+        Should have length `num_gate_params(n, depth)` for some `depth`.
 
     Returns
     -------
@@ -212,8 +215,10 @@ def apply_circuit(depth, initial_state, params):
         The output state as an array of shape `[2] * n`.
     """
 
-    # Infer the number of qubits
+    # Infer the number of qubits and depth
     num_qubits = len(initial_state.shape)
+    # ((num_qubits // 2) * 7) is the number of gates per layer
+    depth = len(circ_params) // ((num_qubits // 2) * 7)
     
     # Number of parameters in RZZ gates
     num_rzz_params = (num_qubits // 2) * depth
@@ -230,11 +235,11 @@ def apply_circuit(depth, initial_state, params):
         # Apply 2- and 1-qubit gates to each pair
         for i, j in pairs:
             # RZZ gate to apply
-            rzz_gate = rzz(params[rzz_off])
+            rzz_gate = rzz(circ_params[rzz_off])
             rzz_off += 1
             # U3 gates to apply
-            u3_gate_i = u3(params[u3_off],   params[u3_off+1], params[u3_off+2])
-            u3_gate_j = u3(params[u3_off+3], params[u3_off+4], params[u3_off+5])
+            u3_gate_i = u3(circ_params[u3_off],   circ_params[u3_off+1], circ_params[u3_off+2])
+            u3_gate_j = u3(circ_params[u3_off+3], circ_params[u3_off+4], circ_params[u3_off+5])
             u3_off += 6
 
             # Multiply the 2- and 1-qubit gates together first
@@ -249,8 +254,28 @@ def apply_circuit(depth, initial_state, params):
     return state
 
 def reshape_params_by_mod(num_qubits, circ_params):
+    """Reshape the circuit parameters into a matrix where each row contains
+    the parameters for layers of the given modulus.
+
+    Parameters
+    ----------
+    num_qubits : int
+        Number of qubits in the circuit.
+    circ_params : jax array
+        List of real parameters that define the ansatz circuit.
+        Should have length `num_gate_params(n, depth)` for some `depth`
+        divisible by `depth_modulus(num_qubits)`.
+
+    Returns
+    -------
+    jax array
+        The circuit parameters reshaped into an array of shape `(x, y)`,
+        where `y = num_gate_params(num_qubits, depth_modulus(num_qubits))`.
+    """
+    
     mod = depth_modulus(num_qubits)
     num_params_per_mod = num_gate_params(num_qubits, mod)
+    # Infer the number of repetitions, which is the first coordinate
     return circ_params.reshape(-1, num_params_per_mod)
 
 def apply_circuit_repeated(initial_state, circ_params):
@@ -264,24 +289,24 @@ def apply_circuit_repeated(initial_state, circ_params):
         Should have shape `[2] * n` for some `n`.
     params : jax array
         List of real parameters that define the ansatz circuit.
-        Should have length `(n // 2) * depth * 7 * k` for some integer `k`.
+        Should have length `num_gate_params(n, depth)` for some `depth`
+        divisible by `depth_modulus(n)`.
 
     Returns
     -------
     jax array
-    The output state as an array of shape `[2] * n`.
+        The output state as an array of shape `[2] * n`.
     """
 
+    # Infer the number of qubits
     num_qubits = len(initial_state.shape)
-    mod = depth_modulus(num_qubits)
     
     # Reshape the parameter array into blocks of the appropriate length for the repeated circuit
-    # Infer the number of repetitions, which is the first coordinate
     reshaped_params = reshape_params_by_mod(num_qubits, circ_params)
 
     # Helper function used to apply a single round of gates of length depth_modulus
     def f(state, p):
-        return apply_circuit(mod, state, p), None
+        return apply_circuit(state, p), None
 
     # Use jax.lax.scan to improve compilation time, instead of unrolling the entire for-loop
     # Inspiration taken from qujax:
@@ -290,8 +315,7 @@ def apply_circuit_repeated(initial_state, circ_params):
     return result
 
 def output_state(num_qubits, all_params):
-    """Given a parameterized ansatz circuit and a target state, compute state
-    output by the circuit.
+    """Compute the state output by the ansatz circuit with given parameters.
 
     Parameters
     ----------
@@ -299,7 +323,10 @@ def output_state(num_qubits, all_params):
         Number of qubits in the circuit.
     all_params : jax array
         Parameters for the ansatz circuit.
-        Should have length `num_params(depth)` for some `depth` divisible by `depth_modulus`.
+        Should have length `2 * num_qubits + num_params(depth)`
+        for some `depth` divisible by `depth_modulus(num_qubits)`.
+        The first `2 * num_qubits` parameters specify the initial product state,
+        and the rest specify the gates in the circuit.
 
     Returns
     -------
@@ -314,13 +341,19 @@ def output_state(num_qubits, all_params):
     return apply_circuit_repeated(initial_state, circ_params)
 
 def make_circuit(num_qubits, all_params, method):
-    """Convert the ansatz parameters into a pytket or qiskit circuit.
+    """Convert the ansatz parameters into a pytket or qiskit circuit
+    that prepares the same state.
 
     Parameters
     ----------
+    num_qubits : int
+        Number of qubits in the circuit.
     all_params : jax array
         Parameters for the ansatz circuit.
-        Must have length `num_params(depth)` for some `depth` dividing `depth_modulus`.
+        Should have length `2 * num_qubits + num_params(depth)`
+        for some `depth` divisible by `depth_modulus(num_qubits)`.
+        The first `2 * num_qubits` parameters specify the initial product state,
+        and the rest specify the gates in the circuit.
     method : str
         One of "pytket" or "qiskit".
 
@@ -332,10 +365,17 @@ def make_circuit(num_qubits, all_params, method):
 
     if method == "pytket":
         qc = Circuit(num_qubits)
+        # Functions that we'll use to apply gates
+        apply_u3 = qc.U3
+        apply_rzz = qc.ZZPhase
     elif method == "qiskit":
         # Need to multiply by pi because pytket's conventions are different from qiskit's
         all_params = all_params * jnp.pi
+        
         qc = QuantumCircuit(num_qubits)
+        # Functions that we'll use to apply gates
+        apply_u3 = qc.u
+        apply_rzz = qc.rzz
     else:
         raise Exception("Unsupported circuit method: " + method)
 
@@ -345,12 +385,10 @@ def make_circuit(num_qubits, all_params, method):
     product_params_reshaped = product_params.reshape(num_qubits, 2)
     for i in range(num_qubits):
         theta, phi = product_params_reshaped[i]
-        if method == "pytket":
-            qc.U3(theta, phi, 0, i)
-        else:
-            qc.u(theta, phi, 0, i)
+        apply_u3(theta, phi, 0, i)
 
     mod = depth_modulus(num_qubits)
+    # Reshape the parameter array into blocks of the appropriate length for the repeated circuit
     circ_params_reshaped = reshape_params_by_mod(num_qubits, circ_params)
     for iter_circ_params in circ_params_reshaped:
         # Number of parameters in RZZ gates
@@ -366,19 +404,13 @@ def make_circuit(num_qubits, all_params, method):
 
             # Apply 2- and 1-qubit gates to each pair
             for i, j in pairs:
-                if method == "pytket":
-                    # RZZ gate to apply
-                    qc.ZZPhase(iter_circ_params[rzz_off], i, j)
-                    # U3 gates to apply
-                    qc.U3(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
-                    qc.U3(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
-                else:
-                    # RZZ gate to apply
-                    qc.rzz(iter_circ_params[rzz_off], i, j)
-                    # U3 gates to apply
-                    qc.u(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
-                    qc.u(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
+                # RZZ gate to apply
+                apply_rzz(iter_circ_params[rzz_off], i, j)
                 rzz_off += 1
+
+                # U3 gates to apply
+                apply_u3(iter_circ_params[u3_off],   iter_circ_params[u3_off+1], iter_circ_params[u3_off+2], i)
+                apply_u3(iter_circ_params[u3_off+3], iter_circ_params[u3_off+4], iter_circ_params[u3_off+5], j)
                 u3_off += 6
                 
     return qc
