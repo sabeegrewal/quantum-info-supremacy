@@ -202,7 +202,7 @@ def random_init_params(num_qubits, depth):
 
     # First generate the product parameters
     # This means taking (theta, phi) but not lamda
-    product_params = np.concatenate([haar_u3_params()[:2] for i in range(n)])
+    product_params = np.concatenate([haar_u3_params()[:2] for i in range(num_qubits)])
 
     # Then generate the U3 parameters
     u3_params = np.concatenate([haar_u3_params() for i in range(2 * num_rzz_params)])
@@ -210,8 +210,8 @@ def random_init_params(num_qubits, depth):
     rzz_params = np.zeros(num_rzz_params)
 
     # Reshape into the appropriate number of blocks for the repeated circuit
-    u3_params_reshaped = u3_params.reshape((depth // depth_modulus, -1))
-    rzz_params_reshaped = rzz_params.reshape((depth // depth_modulus, -1))
+    u3_params_reshaped = u3_params.reshape((depth // mod, -1))
+    rzz_params_reshaped = rzz_params.reshape((depth // mod, -1))
     # Stack RZZ and U3 parameters horizontally, then flatten
     circ_params = np.hstack((rzz_params_reshaped, u3_params_reshaped)).flatten()
     return np.concatenate((product_params, circ_params))
