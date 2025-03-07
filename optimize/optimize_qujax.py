@@ -190,7 +190,7 @@ class AnsatzOptimizer:
             Whether to optimize the loss function accounting for experimental noise.
             Defaults to `False`.
         maxiter : int
-            Maximum number of iterations for the optimizer. Defaults to `2500`.
+            Maximum number of iterations for the optimizer. Defaults to `10000`.
         init_params : jax_array or None
             If provided, the initial parameters for the ansatz circuit.
             Must have length `num_params(depth)`.
