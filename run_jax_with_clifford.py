@@ -320,8 +320,8 @@ def print_results(scoring_state, detect_leakage, result):
     print(f"Observed XEB: {observed_xeb}")
     print(f"Observed pruned XEB: {pruned_xeb}")
 
-n = 6
-depth = 4
+n = 12
+depth = 86
 online = True
 noisy = True
 detect_leakage = False
