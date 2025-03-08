@@ -9,6 +9,7 @@ from pytket.extensions.quantinuum.backends.credential_storage import (
 )
 from pytket.extensions.quantinuum.backends.leakage_gadget import get_leakage_gadget_circuit
 from pytket.passes import SequencePass
+from pytket.backends.resulthandle import ResultHandle
 
 from qujax.statetensor import apply_gate
 from qujax.gates import *
