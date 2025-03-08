@@ -21,7 +21,6 @@ from qujax.gates import *
 import numpy as np
 import time
 import json
-import random
 
 
 def max_register_size():
@@ -375,6 +374,7 @@ def print_results(scoring_state, detect_leakage, result):
 
 
 n = 4
+n_shots = 10
 depth = 84
 online = False
 noisy = True
@@ -429,19 +429,22 @@ for idx in range(1):
     print(f"Est. noisy basis XEB: {basis_xeb * fidelity_from_noise}")
 
     if submit_job:
-        result_handle = backend.process_circuit(overall_circ, n_shots=10000)
-        save_result_handle(
-            n,
-            depth,
-            online,
-            noisy,
-            detect_leakage,
-            toggles,
-            target_state,
-            scoring_state,
-            cliff_output_state,
-            overall_circ,
-            result_handle,
-        )
-        result = await_job(backend, result_handle)
-        print_results(n, detect_leakage, scoring_state, result)
+        if online:
+            result_handle = backend.process_circuit(overall_circ, n_shots=n_shots)
+            save_result_handle(
+                n,
+                depth,
+                online,
+                noisy,
+                detect_leakage,
+                toggles,
+                target_state,
+                scoring_state,
+                cliff_output_state,
+                overall_circ,
+                result_handle,
+            )
+            result = await_job(backend, result_handle)
+        else:
+            result = backend.run_circuit(overall_circ, n_shots=n_shots)
+        print_results(scoring_state, detect_leakage, result)
