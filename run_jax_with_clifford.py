@@ -1,4 +1,4 @@
-from optimize.optimize_qujax import *
+from optimize.optimize_jax import *
 from clifford_utils.random_stabilizer import *
 
 from pytket import Circuit, Qubit, Bit
@@ -320,11 +320,11 @@ def print_results(scoring_state, detect_leakage, result):
     print(f"Observed XEB: {observed_xeb}")
     print(f"Observed pruned XEB: {pruned_xeb}")
 
-n = 12
-depth = 84
+n = 6
+depth = 4
 online = True
 noisy = True
-detect_leakage = True
+detect_leakage = False
 submit_job = True
 
 for seed in range(1):
@@ -338,11 +338,10 @@ for seed in range(1):
     target_state = target_state / np.linalg.norm(target_state)
     # TODO technically we don't need to normalize
 
-    optimizer = AnsatzOptimizer(n)
-    opt = optimizer.optimize(target_state, depth, noisy=noisy)
-    output_state = optimizer.output_state(opt.x)
-    noiseless_fidelity = -optimizer.loss(opt.x, target_state)
-    fidelity_from_noise = optimizer.fidelity_from_noise(opt.x)
+    opt = optimize(target_state, depth, noisy=noisy)
+    output_state = output_state(n, opt.x)
+    noiseless_fidelity = -loss(opt.x, target_state)
+    fidelity_from_noise = fidelity_from_noise(n, opt.x)
     print(f"Noiseless fidelity: {noiseless_fidelity}")
     print(f"Estimated fidelity due to noise: {fidelity_from_noise}")
     print(f"Estimated overall fidelity: {fidelity_from_noise * noiseless_fidelity}")
@@ -350,7 +349,7 @@ for seed in range(1):
     print("")
 
     opt_params = opt.x
-    state_prep_circ = optimizer.pytket_circuit(opt_params)
+    state_prep_circ = make_circuit(n, opt_params, "pytket")
 
     if online:
         backend = QuantinuumBackend(
@@ -373,5 +372,5 @@ for seed in range(1):
         save_result_handle(n, depth, online, noisy, detect_leakage, toggles, target_state, scoring_state,
                            cliff_output_state, overall_circ, result_handle)
         result = await_job(backend, result_handle)
-        print_results(n, detect_leakage, scoring_state, result)
+        print_results(scoring_state, detect_leakage, result)
     

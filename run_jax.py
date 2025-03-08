@@ -1,9 +1,8 @@
-from optimize.optimize_qujax import *
+from optimize.optimize_jax import *
 import qiskit
 from pytket.extensions.quantinuum import QuantinuumBackend, QuantinuumAPIOffline
 
 n = 12
-optimizer = AnsatzOptimizer(n)
 
 import matplotlib.pyplot as plt
 import time
@@ -12,16 +11,16 @@ print(time.time())
 for depth in range(80, 81, 1):
     all_two_qubit_params = []
     for i in range(10):
-        init_params = np.random.normal(size=optimizer.num_params(depth), scale=1.0)
+        init_params = random_init_params(n, depth)
 
         target_state = np.random.normal(size=([2] * n)) + 1j * np.random.normal(
             size=([2] * n)
         )
         target_state = target_state / np.linalg.norm(target_state)
 
-        opt = optimizer.optimize(target_state, depth, noisy=True)
+        opt = optimize(target_state, depth, noisy=True)
         print((depth, opt.fun))
-        all_two_qubit_params.append(optimizer.zzphase_params(opt.x))
+        all_two_qubit_params.append(zzphase_params(n, opt.x))
     par = jnp.array(all_two_qubit_params).flatten()
     par = jnp.mod(par, 1)
     par = 1 / 2 - jnp.abs(par - 1 / 2)
@@ -35,15 +34,15 @@ for depth in range(80, 81, 1):
 print(time.time())
 
 x = opt.x
-qc = optimizer.qiskit_circuit(x)
+qc = make_circuit(n, x, "qiskit")
 import qiskit.quantum_info as qi
 
 qstate = qi.Statevector.from_instruction(qc).data.reshape([2] * n)
-ostate = optimizer.output_state(x)
+ostate = output_state(n, x)
 # Need to transpose because qiskit's convention is to order qubit indices backwards
 print(jnp.vdot(qstate.T, ostate))
 
-pqc = optimizer.pytket_circuit(x)
+pqc = make_circuit(n, x, "pytket")
 
 from pytket.extensions.qiskit import (
     AerStateBackend,
