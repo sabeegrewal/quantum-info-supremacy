@@ -236,9 +236,9 @@ def load_result_handle(filename):
 
     n = int(file.readline()[:-1])
     depth = int(file.readline()[:-1])
-    online = bool(file.readline()[:-1])
-    noisy = bool(file.readline()[:-1])
-    detect_leakage = bool(file.readline()[:-1])
+    online = file.readline()[:-1] == "True"
+    noisy = file.readline()[:-1] == "True"
+    detect_leakage = file.readline()[:-1] == "True"
     # TODO ideally something safer than running eval()...
     toggles = eval(file.readline()[:-1])
     target_state = np.array(eval(file.readline()[:-1]))
