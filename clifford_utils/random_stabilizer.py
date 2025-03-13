@@ -58,7 +58,7 @@ def stabilizer_codim_distribution_cumulative(n):
     return result
 
 
-def random_stabilizer_dim(n, rand_gen=None):
+def random_stabilizer_dim(n, rand_gen=np.random):
     """Sample the dimension of the affine subspace of a
     random stabilizer state.
 
@@ -74,10 +74,7 @@ def random_stabilizer_dim(n, rand_gen=None):
     """
 
     dist = stabilizer_codim_distribution_cumulative(n)
-    if rand_gen:
-        r = rand_gen.uniform()
-    else:
-        r = np.random.uniform()  # Uniform on [0, 1]
+    r = rand_gen.uniform()
     for d in range(n + 1):
         if r < dist[d]:
             # Subtract from n to get dimension from codimension
@@ -123,7 +120,7 @@ def reduced_row_echelon_and_rank(mat):
     return (mat, curr_rank)
 
 
-def random_full_rank_reduced(rows, cols, rand_gen=None):
+def random_full_rank_reduced(rows, cols, rand_gen=np.random):
     """Sample a random full-rank matrix over F2 and return its
     reduced row echelon form.
 
@@ -147,10 +144,7 @@ def random_full_rank_reduced(rows, cols, rand_gen=None):
         # at least 0.288788 in the limit of large dimension,
         # so it should terminate in a reasonable amount of time.
         # TODO maybe put a hard upper bound, just in case?
-        if rand_gen:
-            mat = rand_gen.randint(2, size=(rows, cols), dtype=bool)
-        else:
-            mat = np.random.randint(2, size=(rows, cols), dtype=bool)
+        mat = rand_gen.randint(2, size=(rows, cols), dtype=bool)
         reduced_mat, rank = reduced_row_echelon_and_rank(mat)
         if rank == goal_rank:
             return reduced_mat
@@ -194,7 +188,7 @@ def stabilizer_gate_list(n):
     return result
 
 
-def random_stabilizer_toggles(n):
+def random_stabilizer_toggles(n, rand_gen=np.random):
     """Generate a random stabilizer state as a list of
     gates to toggle in `stabilizer_gate_list(n)`.
 
@@ -211,9 +205,9 @@ def random_stabilizer_toggles(n):
     """
 
     # Sample the dimension of the affine subspace
-    dim = random_stabilizer_dim(n)
+    dim = random_stabilizer_dim(n, rand_gen)
     # Sample the vector space of the right dimension
-    mat = random_full_rank_reduced(dim, n)
+    mat = random_full_rank_reduced(dim, n, rand_gen)
     # Hadamard the qubits corresponding to any leading 1
     # The .nonzero()[0][0] reports the first entry that is True
     # Since the matrix is full-rank it will always succeed
@@ -223,7 +217,7 @@ def random_stabilizer_toggles(n):
     # X layer
     for i in range(n):
         # Apply X gates uniformly at random
-        result.append(np.random.randint(2, dtype=bool))
+        result.append(rand_gen.randint(2, dtype=bool))
     # Hadamard layer
     for i in range(n):
         # Apply Hadamard gates to qubits in the set
@@ -232,7 +226,7 @@ def random_stabilizer_toggles(n):
     for i in range(n):
         # Apply S gates uniformly at random,
         # but only to qubits in the set
-        result.append(i in leading_qubits and np.random.randint(2, dtype=bool))
+        result.append(i in leading_qubits and rand_gen.randint(2, dtype=bool))
     # CZ layer
     for i in range(n):
         for j in range(i + 1, n):
@@ -241,7 +235,7 @@ def random_stabilizer_toggles(n):
             result.append(
                 i in leading_qubits
                 and j in leading_qubits
-                and np.random.randint(2, dtype=bool)
+                and rand_gen.randint(2, dtype=bool)
             )
     # CNOT layer
     for i in range(n):
@@ -317,7 +311,7 @@ def stabilizer_gate_list_ag(n):
     return result
 
 
-def random_stabilizer_toggles_ag(n, rand_gen=None):
+def random_stabilizer_toggles_ag(n, rand_gen=np.random):
     """Generate a random stabilizer state as a list of
     gates to toggle in `stabilizer_gate_list_ag(n)`.
 
@@ -346,7 +340,7 @@ def random_stabilizer_toggles_ag(n, rand_gen=None):
     # X layer
     for i in range(n):
         # Apply X gates uniformly at random
-        result.append(np.random.randint(2, dtype=bool))
+        result.append(rand_gen.randint(2, dtype=bool))
     # Hadamard layer
     for i in range(n):
         # Apply Hadamard gates to all qubits
@@ -355,7 +349,7 @@ def random_stabilizer_toggles_ag(n, rand_gen=None):
     for i in range(n):
         # Apply S gates uniformly at random,
         # but only to qubits in the set
-        result.append(i in leading_qubits and np.random.randint(2, dtype=bool))
+        result.append(i in leading_qubits and rand_gen.randint(2, dtype=bool))
     # CZ layer
     for i in range(n):
         for j in range(i + 1, n):
@@ -367,7 +361,7 @@ def random_stabilizer_toggles_ag(n, rand_gen=None):
             active_1 = (
                 i in leading_qubits
                 and j in leading_qubits
-                and np.random.randint(2, dtype=bool)
+                and rand_gen.randint(2, dtype=bool)
             )
             active_2 = (
                 i in leading_qubits
