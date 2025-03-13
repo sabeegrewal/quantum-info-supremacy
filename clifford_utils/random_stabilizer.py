@@ -1,4 +1,3 @@
-import random
 import functools
 import numpy as np
 
@@ -76,9 +75,9 @@ def random_stabilizer_dim(n, rand_gen=None):
 
     dist = stabilizer_codim_distribution_cumulative(n)
     if rand_gen:
-        r = rand_gen.random()
+        r = rand_gen.uniform()
     else:
-        r = random.random()  # Uniform on [0, 1]
+        r = np.random.uniform()  # Uniform on [0, 1]
     for d in range(n + 1):
         if r < dist[d]:
             # Subtract from n to get dimension from codimension
@@ -224,7 +223,7 @@ def random_stabilizer_toggles(n):
     # X layer
     for i in range(n):
         # Apply X gates uniformly at random
-        result.append(random.getrandbits(1) == 1)
+        result.append(np.random.randint(2, dtype=bool))
     # Hadamard layer
     for i in range(n):
         # Apply Hadamard gates to qubits in the set
@@ -233,7 +232,7 @@ def random_stabilizer_toggles(n):
     for i in range(n):
         # Apply S gates uniformly at random,
         # but only to qubits in the set
-        result.append(i in leading_qubits and random.getrandbits(1) == 1)
+        result.append(i in leading_qubits and np.random.randint(2, dtype=bool))
     # CZ layer
     for i in range(n):
         for j in range(i + 1, n):
@@ -242,7 +241,7 @@ def random_stabilizer_toggles(n):
             result.append(
                 i in leading_qubits
                 and j in leading_qubits
-                and random.getrandbits(1) == 1
+                and np.random.randint(2, dtype=bool)
             )
     # CNOT layer
     for i in range(n):
@@ -347,7 +346,7 @@ def random_stabilizer_toggles_ag(n, rand_gen=None):
     # X layer
     for i in range(n):
         # Apply X gates uniformly at random
-        result.append(random.getrandbits(1) == 1)
+        result.append(np.random.randint(2, dtype=bool))
     # Hadamard layer
     for i in range(n):
         # Apply Hadamard gates to all qubits
@@ -356,7 +355,7 @@ def random_stabilizer_toggles_ag(n, rand_gen=None):
     for i in range(n):
         # Apply S gates uniformly at random,
         # but only to qubits in the set
-        result.append(i in leading_qubits and random.getrandbits(1) == 1)
+        result.append(i in leading_qubits and np.random.randint(2, dtype=bool))
     # CZ layer
     for i in range(n):
         for j in range(i + 1, n):
@@ -368,7 +367,7 @@ def random_stabilizer_toggles_ag(n, rand_gen=None):
             active_1 = (
                 i in leading_qubits
                 and j in leading_qubits
-                and random.getrandbits(1) == 1
+                and np.random.randint(2, dtype=bool)
             )
             active_2 = (
                 i in leading_qubits

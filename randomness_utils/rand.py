@@ -70,7 +70,7 @@ class TrueRandom:
         uint_value = struct.unpack(">I", raw_bytes)[0]  # Convert to 32-bit unsigned int
         return uint_value / 2**32  # Normalize to [0,1)
 
-    def random(self):
+    def uniform(self):
         """Generate a uniform random number in [0,1)"""
         return self._random_uniform_0_1()
 
@@ -112,7 +112,7 @@ class TrueRandom:
         self.bit_pos += 1
         return bit
 
-    def randint(self, high, size, dtype=bool):
+    def randint(self, high, size=None, dtype=bool):
         """
         Mimics np.random.randint(2, size=(rows, cols), dtype=bool).
         This generates a boolean array where each element is either True (1) or False (0).
@@ -122,7 +122,10 @@ class TrueRandom:
                 "Only np.random.randint(2, size=..., dtype=bool) is supported."
             )
 
-        total_values = np.prod(size)
+        if size is None:
+            total_values = 1
+        else:
+            total_values = np.prod(size)
         if total_values > (len(self.chunk) - self.chunk_pos) * 8:
             raise RuntimeError(
                 "Not enough randomness to generate requested boolean values."
@@ -132,7 +135,10 @@ class TrueRandom:
         bool_array = np.array(
             [self._random_bit() for _ in range(total_values)], dtype=bool
         )
-        return bool_array.reshape(size)
+        if size is None:
+            return bool_array[0]
+        else:
+            return bool_array.reshape(size)
 
 
 # A few ad hoc tests i ran...
