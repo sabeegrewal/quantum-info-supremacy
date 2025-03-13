@@ -34,7 +34,7 @@ for depth in range(80, 81, 1):
 print(time.time())
 
 x = opt.x
-qc = make_circuit(n, x, "qiskit")
+qc = make_ansatz_circuit(n, x, "qiskit")
 import qiskit.quantum_info as qi
 
 qstate = qi.Statevector.from_instruction(qc).data.reshape([2] * n)
@@ -42,7 +42,7 @@ ostate = output_state(n, x)
 # Need to transpose because qiskit's convention is to order qubit indices backwards
 print(jnp.vdot(qstate.T, ostate))
 
-pqc = make_circuit(n, x, "pytket")
+pqc = make_ansatz_circuit(n, x, "pytket")
 
 from pytket.extensions.qiskit import (
     AerStateBackend,

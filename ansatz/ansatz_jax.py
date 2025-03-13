@@ -340,7 +340,7 @@ def output_state(num_qubits, all_params):
     initial_state = product_state(product_params)
     return apply_circuit_repeated(initial_state, circ_params)
 
-def make_circuit(num_qubits, all_params, method):
+def make_ansatz_circuit(num_qubits, all_params, method):
     """Convert the ansatz parameters into a pytket or qiskit circuit
     that prepares the same state.
 

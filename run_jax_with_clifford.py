@@ -350,7 +350,7 @@ for seed in range(1):
     print("")
 
     opt_params = opt.x
-    state_prep_circ = make_circuit(n, opt_params, "pytket")
+    state_prep_circ = make_ansatz_circuit(n, opt_params, "pytket")
 
     if online:
         backend = QuantinuumBackend(
