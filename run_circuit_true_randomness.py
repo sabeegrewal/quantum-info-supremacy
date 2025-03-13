@@ -1,4 +1,4 @@
-from optimize.optimize_qujax import *
+from optimize.optimize_jax import *
 from clifford_utils.random_stabilizer import *
 
 from randomness_utils import rand
@@ -23,101 +23,135 @@ import time
 import json
 
 
-def max_register_size():
-    """The maximum classical register size that can be used on
-    quantinuum devices.
-
-    Returns
-    -------
-    int
-        Currently defaults to 32; see
-        https://docs.quantinuum.com/tket/extensions/pytket-quantinuum/changelog.html#id4
-    """
-    return 32
-
-
-def make_and_apply_cliff(target_state, output_state, rand_gen=None):
-    """Generate a random Clifford circuit and apply it to the target and output states.
+def make_clifford_circuit(n, reversed_ag_toggles, backend):
+    """Make a Clifford measurement circuit for the given list of toggles.
 
     Parameters
     ----------
-    target_state : array
-        Complex array of shape `[2] * n` for some `n`.
-    output_state : array
-        Complex array of shape `[2] * n` for some `n`.
+    n : int
+        Number of qubits.
+    reversed_ag_toggles : list[bool]
+        List of toggles corresponding to a reversed Aaronson-Gottesman state preparation circuit.
+        Should have length equal to `num_stab_gates_ag(n)`.
+    backend : Backend
+        Backend to use for compilation.
+        Needed to ensure the classical registers have appropriate width.
 
     Returns
     -------
-    (list[bool], Circuit, array, array)
-        A list of which Clifford gates to toggle using Aaronson-Gottesman compilation of the measurement,
-        a pytket Circuit implementing the Clifford measurement, and the states obtained by applying the
-        Clifford to the target state and output state, respectively.
+    Circuit
+        A pytket Circuit implementing the Clifford measurement.
     """
-
-    # Infer the number of qubits from the dimension
-    n = len(target_state.shape)
-
-    # Generate toggles for preparing a random stabilizer state
-    toggles = random_stabilizer_toggles_ag(n, rand_gen)
-    # Reverse to turn into a measurement
-    toggles.reverse()
-    num_stab_gates = len(toggles)
-    # Also get the corresponding gates
-    stab_gates = stabilizer_gate_list_ag(n)
-    stab_gates.reverse()
-
-    # Now make the circuit
+    
     cliff_circ = Circuit(n)
-    scoring_state = target_state
-    cliff_output_state = output_state
+    
+    # Add classical registers for the Clifford gate controls
+    num_stab_gates = num_stab_gates_ag(n)
+    # Maximum classical register width
+    max_register_width = backend.backend_info.get_misc("max_classical_register_width")
+    # Divide the stabilizer gate controls into registers of size max_register_width
+    for i in range(
+        num_stab_gates // max_register_width
+        + bool(num_stab_gates % max_register_width)
+    ):
+        cliff_circ.add_c_register(f"clifford{i}", max_register_width)
+
+
+    # List of all control bits, in order
+    bits = [
+        Bit(
+            f"clifford{i // max_register_width}", i % max_register_width
+        ) for i in range(num_stab_gates)
+    ]
+    # Set all of the classical toggles before doing any gates
+    cliff_circ.add_c_setbits(reversed_ag_toggles, bits)
+
+    # Get the corresponding gates
+    stab_gates = list(reversed(stabilizer_gate_list_ag(n)))
+
+    # Now apply the gates
     for i in range(num_stab_gates):
         # Add a classically-controlled gate for each toggle
         # Divide the bits into registers of size max_register_size()
-        control_bit = Bit(
-            "clifford" + str(i // max_register_size()), i % max_register_size()
-        )
-        cliff_circ.add_bit(control_bit)
-        # Set the classical control bit according to the toggle
-        cliff_circ.add_c_setbits([toggles[i]], [control_bit])
+        control_bit = Bit(f"clifford{i // max_register_width}", i % max_register_width)
 
-        # Now add the relevant controlled gate to the circuit
+        # Add the relevant controlled gate to the circuit
         gate_name, qubits = stab_gates[i]
         if gate_name == "x":
             cliff_circ.X(*qubits, condition=control_bit)
-            qujax_gate = X
         elif gate_name == "h":
             cliff_circ.H(*qubits, condition=control_bit)
-            qujax_gate = H
         elif gate_name == "s":
             cliff_circ.Sdg(*qubits, condition=control_bit)
-            qujax_gate = Sdg
         elif gate_name == "cz":
             cliff_circ.CZ(*qubits, condition=control_bit)
-            qujax_gate = CZ
         else:
             raise Exception("invalid gate name: " + gate_name)
 
-        # Apply the gate to the two states
-        if toggles[i]:
-            scoring_state = apply_gate(scoring_state, qujax_gate, qubits)
-            cliff_output_state = apply_gate(cliff_output_state, qujax_gate, qubits)
-
-    return (toggles, cliff_circ, scoring_state, cliff_output_state)
+    return cliff_circ
 
 
-def make_overall_circ(
-    state_prep_circ, cliff_circ, backend, detect_leakage, num_leakage_qubits=1
-):
-    """Make the overall pytket Circuit that includes both state preparation and measurement.
+def apply_clifford(state, reversed_ag_toggles):
+    """Apply a Clifford measurement circuit for the given list of toggles to the given state.
 
     Parameters
     ----------
-    state_prep_circ : Circuit
-        pytket Circuit implementing state preparation. Should have only a quantum register.
-    cliff_circ : Circuit
-        pytket Circuit implementing Clifford measurement.
-        Should have the same number of qubits as `state_prep_circ` and classical registers
-        for the classically-controlled Clifford gates.
+    state : array
+        Complex array of shape `[2] * n` for some `n`.
+    reversed_ag_toggles : list[bool]
+        List of toggles corresponding to a reversed Aaronson-Gottesman state preparation circuit.
+        Should have length equal to `num_stab_gates_ag(n)`.
+
+    Returns
+    -------
+    array, array
+        The state obtained by applying the Clifford measurement to the input state.
+    """
+
+    # Infer the number of qubits from the dimension
+    n = len(state.shape)
+    num_stab_gates = num_stab_gates_ag(n)
+
+    # Get the corresponding gates
+    stab_gates = list(reversed(stabilizer_gate_list_ag(n)))
+
+    for i in range(num_stab_gates):
+        if reversed_ag_toggles[i]:
+            # Compute and apply the relevant gate
+            gate_name, qubits = stab_gates[i]
+            if gate_name == "x":
+                qujax_gate = X
+            elif gate_name == "h":
+                qujax_gate = H
+            elif gate_name == "s":
+                qujax_gate = Sdg
+            elif gate_name == "cz":
+                qujax_gate = CZ
+            else:
+                raise Exception("invalid gate name: " + gate_name)
+                
+            state = apply_gate(state, qujax_gate, qubits)
+
+    return state
+
+
+def stitch_circuits(
+    state_prep_circs, cliff_circs, backend, detect_leakage, num_leakage_qubits=1
+):
+    """Make the overall pytket Circuit that includes both state preparation and measurement
+    for each of the given circuits.
+
+    Parameters
+    ----------
+    state_prep_circ : list[Circuit]
+        List of pytket Circuits implementing state preparation.
+        Each circuit should have only a quantum register, each with the
+        same number of qubits.
+    cliff_circ : list[Circuit]
+        List of pytket Circuits implementing Clifford measurement.
+        Should have the same length as `state_prep_circs`.
+        Each circuit should have the same number of qubits as hose in `state_prep_circs`,
+        and classical registers for the classically-controlled Clifford gates.
     backend : Backend
         Backend to use for compilation.
     detect_leakage : bool
@@ -128,44 +162,74 @@ def make_overall_circ(
     Returns
     -------
     Circuit
-        A combined and compiled pytket Circuit.
+        A combined and compiled pytket Circuit that stitches all of the runs together.
     """
+    
+    n = state_prep_circs[0].n_qubits
+    num_circs = len(state_prep_circs)
+
+    # Check that the input is valid
+    assert len(cliff_circs) == num_circs
+    for circ_idx in range(num_circs):
+        assert state_prep_circs[circ_idx].n_qubits == n
+        assert cliff_circs[circ_idx].n_qubits == n
 
     # Make an empty circuit with n qubits
-    n = state_prep_circ.n_qubits
-    assert cliff_circ.n_qubits == n
     overall_circ = Circuit(n)
 
-    # Add classically-controlled registers for the Clifford gates
-    num_stab_gates = num_stab_gates_ag(n)
-    # Divide the stabilizer gate controls into registers of size max_register_size()
-    for i in range(
-        num_stab_gates // max_register_size()
-        + bool(num_stab_gates % max_register_size())
-    ):
-        overall_circ.add_c_register("clifford" + str(i), max_register_size())
-
-    # State preparation
-    overall_circ.append(state_prep_circ)
-
-    # Leakage detection
+    # Add classical registers for leakage detection, if necessary
     if detect_leakage:
+        for circ_idx in range(num_circs):
+            # Register width is number of qubits
+            overall_circ.add_c_register(f"leakage_detection{circ_idx}", n)
+
+    # Add classical registers for the Clifford gate controls
+    # These registers get reused for each of the stitched sub-circuits
+    num_stab_gates = num_stab_gates_ag(n)
+    # Maximum classical register width
+    max_register_width = backend.backend_info.get_misc("max_classical_register_width")
+    # Divide the stabilizer gate controls into registers of size max_register_width
+    for i in range(
+        num_stab_gates // max_register_width
+        + bool(num_stab_gates % max_register_width)
+    ):
+        overall_circ.add_c_register(f"clifford{i}", max_register_width)
+
+    # Add classical registers for the measurement results
+    for circ_idx in range(num_circs):
+        # Register width is number of qubits
+        overall_circ.add_c_register(f"measurement{circ_idx}", n)
+
+    # Stitch the circuits together sequentially
+    for circ_idx in range(num_circs):
+        if circ_idx > 0:
+            # After the first iteration, add a barrier and reset all qubits to 0
+            overall_circ.add_barrier(overall_circ.qubits + overall_circ.bits)
+            for i in range(n):
+                overall_circ.Reset(i)
+
+        # State preparation
+        overall_circ.append(state_prep_circs[circ_idx])
+
+        # Leakage detection
+        if detect_leakage:
+            for i in range(n):
+                leakage_gadget = get_leakage_gadget_circuit(
+                    Qubit(i), # Circuit qubit
+                    Qubit(n + (i % num_leakage_qubits)), # Postselection qubit
+                    Bit(f"leakage_detection{circ_idx}", i), # Store result here
+                )
+                overall_circ.append(leakage_gadget)
+
+        # Barrier between state preparation and Clifford measurement
+        overall_circ.add_barrier(overall_circ.qubits + overall_circ.bits)
+
+        # Clifford
+        overall_circ.append(cliff_circs[circ_idx])
+
+        # Measurement
         for i in range(n):
-            leakage_gadget = get_leakage_gadget_circuit(
-                Qubit("q", i),
-                Qubit("q", n + (i % num_leakage_qubits)),
-                Bit("leakage_detection_bit", i),
-            )
-            overall_circ.append(leakage_gadget)
-
-    # Barrier between state preparation and Clifford measurement
-    overall_circ.add_barrier(overall_circ.qubits + overall_circ.bits)
-
-    # Clifford
-    overall_circ.append(cliff_circ)
-
-    # Measurement
-    overall_circ.measure_all()
+            overall_circ.Measure(Qubit(i), Bit(f"measurement{circ_idx}", i))
 
     # Custom compilation pass:
     # Level 2 optimisation doesn't get the classically-controlled CZ gates right,
@@ -183,24 +247,14 @@ def make_overall_circ(
     compilation_pass = SequencePass(my_pass_list)
     compilation_pass.apply(overall_circ)
 
+    # TODO add some more sanity checks before returning
+    # See https://docs.quantinuum.com/systems/trainings/knowledge_articles/circuit_stitching.html
+
     return overall_circ
 
 
-def save_result_handle(
-    n,
-    depth,
-    online,
-    noisy,
-    detect_leakage,
-    toggles,
-    target_state,
-    scoring_state,
-    cliff_output_state,
-    overall_circ,
-    result_handle,
-    filename=None,
-):
-    """Save the data for this job submission locally so that it can be recovered later.
+class JobData:
+    """Class for storing data associated with a job submission.
 
     Parameters
     ----------
@@ -208,93 +262,113 @@ def save_result_handle(
         Number of qubits.
     depth : int
         Depth of the state preparation circuit, as measured by 2-qubit gate layers.
-    online : bool
-        Whether the job was run online or locally.
     noisy : bool
-        Whether the circuit was optimized using the noisy or noiseless loss function.
+        Whether the circuits were optimized using the noisy or noiseless loss function.
+    device_name : str
+        Device name, e.g. "H1-1", "H1-1E", "H1-1LE".
     detect_leakage : bool
         Whether the circuit uses the leakage detection gadget.
-    toggles : list[bool]
-        A list of which Clifford gates are toggled using Aaronson-Gottesman compilation of the measurement.
-    target_state : array
-        Complex array of shape `[2] * n`.
-    scoring_state : array
-        Complex array of shape `[2] * n`
-    cliff_output_state : array
-        Complex array of shape `[2] * n`
+    seeds : list[int]
+        List of seeds used for randomness in each of the trials.
+    target_states : list[array]
+        List of complex arrays of shape `[2] * n`.
+    reversed_ag_toggle_lists : list[list[bool]]
+        A list of which Clifford gates are toggled using Aaronson-Gottesman compilation of the measurement,
+        one for each trial.
+    opt_param_lists : list[array]
+        List of real arrays containing the optimized circuit parameters for each state.
     overall_circ : Circuit
         The circuit submitted to the backend.
     result_handle : ResultHandle
         Handle used to access the job result.
-    filename : str
-        Optional filename to which the data should be saved. Defaults to a file location in the `job_handles`
-        folder with a name that is a concatenation of the number of qubits, depth, and current time.
     """
-    if filename is None:
-        time_str = time.asctime().replace("/", "_").replace(":", "-").replace(" ", "_")
-        filename = f"job_handles/{n}_{depth}_{time_str}.txt"
-
-    file = open(filename, "w")
-    file.write(str(n) + "\n")
-    file.write(str(depth) + "\n")
-    file.write(str(online) + "\n")
-    file.write(str(noisy) + "\n")
-    file.write(str(detect_leakage) + "\n")
-    file.write(str(toggles) + "\n")
-    file.write(str(target_state.tolist()) + "\n")
-    file.write(str(scoring_state.tolist()) + "\n")
-    file.write(str(cliff_output_state.tolist()) + "\n")
-    file.write(json.dumps(overall_circ.to_dict()) + "\n")
-    file.write(str(result_handle) + "\n")
-    file.close()
-
-
-def load_result_handle(filename):
-    """Load the data that was saved using `save_result_handle`.
-
-    Parameters
-    ----------
-    filename : str
-        File to load from.
-
-    Returns
-    -------
-    (int, int, bool, bool, bool, list[bool], array, array, array, Circuit, ResultHandle)
-        The data saved using `save_result_handle`.
-    """
-
-    file = open(filename, "r")
-
-    n = int(file.readline()[:-1])
-    depth = int(file.readline()[:-1])
-    online = bool(file.readline()[:-1])
-    noisy = bool(file.readline()[:-1])
-    detect_leakage = bool(file.readline()[:-1])
-    # TODO ideally something safer than running eval()...
-    toggles = eval(file.readline()[:-1])
-    target_state = np.array(eval(file.readline()[:-1]))
-    scoring_state = np.array(eval(file.readline()[:-1]))
-    cliff_output_state = np.array(eval(file.readline()[:-1]))
-    overall_circ = Circuit.from_dict(json.loads(file.readline()[:-1]))
-    result_handle = ResultHandle.from_str(file.readline()[:-1])
-
-    return (
+    def __init__(
+        self,
         n,
         depth,
-        online,
         noisy,
+        device_name,
         detect_leakage,
-        toggles,
-        target_state,
-        scoring_state,
-        cliff_output_state,
+        seeds,
+        target_states,
+        reversed_ag_toggle_lists,
+        opt_param_lists,
         overall_circ,
-        result_handle,
-    )
+        result_handle
+    ):
+        self.n = n
+        self.depth = depth
+        self.noisy = noisy
+        self.device_name = device_name
+        self.detect_leakage = detect_leakage
+        self.seeds = seeds
+        self.target_states = np.array(target_states)
+        self.reversed_ag_toggle_lists = reversed_ag_toggle_lists
+        self.opt_param_lists = np.array(opt_param_lists)
+        self.overall_circ = overall_circ
+        self.result_handle = result_handle
+
+    def save(self, filename=None):
+        """Save the data for this job submission locally so that it can be recovered later.
+
+        Parameters
+        ----------
+        filename : str
+            Optional filename to which the data should be saved. Defaults to a file location in the `job_handles`
+            folder with a name that is a concatenation of the number of qubits, depth, and current time.
+        """
+        if filename is None:
+            time_str = time.asctime().replace("/","_").replace(":","-").replace(" ","_")
+            filename = f"job_handles/{n}_{depth}_{time_str}.txt"
+
+        file = open(filename, "w")
+        file.write(str(self.n) + "\n")
+        file.write(str(self.depth) + "\n")
+        file.write(str(self.noisy) + "\n")
+        file.write(self.device_name + "\n")
+        file.write(str(self.detect_leakage) + "\n")
+        file.write(str(self.seeds) + "\n")
+        file.write(str(self.target_states.tolist()) + "\n")
+        file.write(str(self.reversed_ag_toggle_lists) + "\n")
+        file.write(str(self.opt_param_lists.tolist()) + "\n")
+        file.write(json.dumps(self.overall_circ.to_dict()) + "\n")
+        file.write(str(self.result_handle) + "\n")
+        file.close()
+
+    @staticmethod
+    def load(filename):
+        file = open(filename, "r")
+
+        n = int(file.readline()[:-1])
+        depth = int(file.readline()[:-1])
+        noisy = file.readline()[:-1] == "True"
+        device_name = file.readline()[:-1]
+        detect_leakage = file.readline()[:-1] == "True"
+        # TODO ideally something safer than running eval()...
+        seeds = eval(file.readline()[:-1])
+        target_states = np.array(eval(file.readline()[:-1]))
+        reversed_ag_toggle_lists = eval(file.readline()[:-1])
+        opt_param_lists = np.array(eval(file.readline()[:-1]))
+        overall_circ = Circuit.from_dict(json.loads(file.readline()[:-1]))
+        result_handle = ResultHandle.from_str(file.readline()[:-1])
+
+        return JobData(
+            n,
+            depth,
+            noisy,
+            device_name,
+            detect_leakage,
+            seeds,
+            target_states,
+            reversed_ag_toggle_lists,
+            opt_param_lists,
+            overall_circ,
+            result_handle,
+        )
 
 
 def await_job(backend, result_handle, sleep=20, trials=1000):
-    """Load the data that was saved using `save_result_handle`.
+    """Retrieve a job from the server, waiting until completed.
 
     Parameters
     ----------
@@ -333,95 +407,105 @@ def await_job(backend, result_handle, sleep=20, trials=1000):
     return result
 
 
-def print_results(scoring_state, detect_leakage, result):
-    """Compute and print XEB scores from the results on the given scoring state.
+def print_results(scoring_states, detect_leakage, result):
+    """Compute and print XEB scores from the results on the given scoring states.
 
     Parameters
     ----------
-    scoring_state : array
-        Complex array of shape `[2] * n' for some `n`.
+    scoring_states : array
+        List of complex arrays of shape `[2] * n' for some `n`.
     detect_leakage : bool
         Whether to the leakage detection gadget was used.
     result : BackendResult
         Result containing samples from the output distribution.
     """
 
-    n = len(scoring_state.shape)
+    n = len(scoring_states[0].shape)
 
-    # The bits that were measured in each shot
-    measured_bits = [Bit("c", i) for i in range(n)]
-    if detect_leakage:
-        measured_bits = measured_bits + [
-            Bit("leakage_detection_bit", i) for i in range(n)
+    for circ_idx in range(len(scoring_states)):
+        # The bits that were measured in each shot
+        measured_bits = [Bit(f"measurement{circ_idx}", i) for i in range(n)]
+        if detect_leakage:
+            measured_bits = measured_bits + [
+                Bit(f"leakage_detection{circ_idx}", i) for i in range(n)
+            ]
+        all_shots_with_leakage_results = result.get_shots(cbits=measured_bits)
+        all_shots = [shot[:n] for shot in all_shots_with_leakage_results]
+        # Prunes all shots detected as leaky
+        pruned_shots = [
+            shot[:n] for shot in all_shots_with_leakage_results if not any(shot[n:])
         ]
-    all_shots_with_leakage_results = result.get_shots(cbits=measured_bits)
-    all_shots = [shot[:n] for shot in all_shots_with_leakage_results]
-    # Prunes all shots detected as leaky
-    pruned_shots = [
-        shot[:n] for shot in all_shots_with_leakage_results if not any(shot[n:])
-    ]
 
-    xeb_scores = [abs(scoring_state[tuple(shot)]) ** 2 * 2**n - 1 for shot in all_shots]
-    pruned_xeb_scores = [
-        abs(scoring_state[tuple(shot)]) ** 2 * 2**n - 1 for shot in pruned_shots
-    ]
+        xeb_scores = [abs(scoring_states[circ_idx][tuple(shot)]) ** 2 * 2**n - 1 for shot in all_shots]
+        pruned_xeb_scores = [
+            abs(scoring_states[circ_idx][tuple(shot)]) ** 2 * 2**n - 1 for shot in pruned_shots
+        ]
 
-    observed_xeb = sum(xeb_scores) / len(xeb_scores)
-    pruned_xeb = sum(pruned_xeb_scores) / len(pruned_xeb_scores)
+        observed_xeb = sum(xeb_scores) / len(xeb_scores)
+        pruned_xeb = sum(pruned_xeb_scores) / len(pruned_xeb_scores)
 
-    print(f"Observed XEB: {observed_xeb}")
-    print(f"Observed pruned XEB: {pruned_xeb}")
+        print(f"Observed XEB: {observed_xeb}")
+        print(f"Observed pruned XEB: {pruned_xeb}")
 
 
-n = 4
-n_shots = 10
-depth = 84
-online = False
+n = 12
+depth = 86
 noisy = True
-detect_leakage = True
-submit_job = True
+device_name = "H1-1SE"
+detect_leakage = False
 
-for idx in range(1):
-    print(f"index {idx}")
-    random_bits = rand.read_chunk(idx)
+submit_job = True
+n_stitches = 5
+n_shots = 10000 // n_stitches
+
+for seed in range(1):
+    print(f"seed {seed}")
+    random_bits = rand.read_chunk(seed)
     rand_gen = rand.TrueRandom(random_bits)
 
+    # First do all of the randomness generation
+    target_state_r = rand_gen.normal(size=([2] * n))
+    target_state_i = rand_gen.normal(size=([2] * n))
+    target_state = (target_state_r + 1j * target_state_i) / 2**((n + 1) / 2)
+
+    ag_toggles = random_stabilizer_toggles_ag(n, rand_gen)
+    reversed_ag_toggles = list(reversed(ag_toggles))
+
+    # Optimize
     start = time.time()
+    # Ensure initial parameters are chosen consistently pseudorandomly
+    np.random.seed(seed)
+    opt = optimize(target_state, depth, noisy=noisy)
+    opt_params = opt.x
 
-    target_state = rand_gen.normal(size=([2] * n)) + 1j * rand_gen.normal(
-        size=([2] * n)
-    )
-    target_state = target_state / np.linalg.norm(target_state)
-    # TODO technically we don't need to normalize
-
-    optimizer = AnsatzOptimizer(n)
-    opt = optimizer.optimize(target_state, depth, noisy=noisy)
-    output_state = optimizer.output_state(opt.x)
-    noiseless_fidelity = -optimizer.loss(opt.x, target_state)
-    fidelity_from_noise = optimizer.fidelity_from_noise(opt.x)
+    output_state = output_state(n, opt_params)
+    noiseless_fidelity = -loss(opt_params, target_state)
+    fidelity_from_noise = fidelity_from_noise(n, opt_params)
     print(f"Noiseless fidelity: {noiseless_fidelity}")
     print(f"Estimated fidelity due to noise: {fidelity_from_noise}")
     print(f"Estimated overall fidelity: {fidelity_from_noise * noiseless_fidelity}")
     print(f"Optimization time: {time.time() - start}")
     print("")
 
-    opt_params = opt.x
-    state_prep_circ = optimizer.pytket_circuit(opt_params)
-
-    if online:
+    if device_name == "H1-1LE":
+        api_offline = QuantinuumAPIOffline()
+        backend = QuantinuumBackend(device_name=device_name, api_handler=api_offline)
+    else:
         backend = QuantinuumBackend(
-            device_name="H1-1E",
+            device_name=device_name,
             api_handler=QuantinuumAPI(token_store=QuantinuumConfigCredentialStorage()),
         )
-    else:
-        api_offline = QuantinuumAPIOffline()
-        backend = QuantinuumBackend(device_name="H1-1LE", api_handler=api_offline)
 
-    toggles, cliff_circ, scoring_state, cliff_output_state = make_and_apply_cliff(
-        target_state, output_state, rand_gen
-    )
-    overall_circ = make_overall_circ(
-        state_prep_circ, cliff_circ, backend, detect_leakage
+    state_prep_circ = make_ansatz_circuit(n, opt_params, method="pytket")
+    cliff_circ = make_clifford_circuit(n, reversed_ag_toggles, backend)
+    scoring_state = apply_clifford(target_state, reversed_ag_toggles)
+    cliff_output_state = apply_clifford(output_state, reversed_ag_toggles)
+    
+    overall_circ = stitch_circuits(
+        [state_prep_circ] * n_stitches,
+        [cliff_circ] * n_stitches,
+        backend,
+        detect_leakage
     )
 
     basis_xeb = sum(abs((scoring_state * cliff_output_state).flatten() ** 2)) * 2**n - 1
@@ -429,22 +513,26 @@ for idx in range(1):
     print(f"Est. noisy basis XEB: {basis_xeb * fidelity_from_noise}")
 
     if submit_job:
-        if online:
+        if device_name == "H1-1LE":
+            result = backend.run_circuit(overall_circ, n_shots=n_shots)
+        else:
+            if device_name == "H1-1":
+                input("Submitting job to the real machine! Press enter to continue.")
             result_handle = backend.process_circuit(overall_circ, n_shots=n_shots)
-            save_result_handle(
+            job_data = JobData(
                 n,
                 depth,
-                online,
                 noisy,
+                device_name,
                 detect_leakage,
-                toggles,
-                target_state,
-                scoring_state,
-                cliff_output_state,
+                [seed] * n_stitches,
+                [target_state] * n_stitches,
+                [reversed_ag_toggles] * n_stitches,
+                [opt_params] * n_stitches,
                 overall_circ,
-                result_handle,
+                result_handle
             )
+            job_data.save()
             result = await_job(backend, result_handle)
-        else:
-            result = backend.run_circuit(overall_circ, n_shots=n_shots)
-        print_results(scoring_state, detect_leakage, result)
+            
+        print_results([scoring_state] * n_stitches, detect_leakage, result)
