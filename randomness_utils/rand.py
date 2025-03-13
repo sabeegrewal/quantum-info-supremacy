@@ -81,7 +81,7 @@ class TrueRandom:
         :return: np.ndarray of normally distributed values.
         """
         total_values = np.prod(size)  # Total numbers required
-        if total_values * 2 * 4 > len(self.chunk) - self.chunk_pos:
+        if ((total_values + 1) // 2) * 2 * 4 > len(self.chunk) - self.chunk_pos:
             raise RuntimeError(
                 "Not enough randomness to generate requested normal values."
             )
