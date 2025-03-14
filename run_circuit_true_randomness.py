@@ -65,6 +65,10 @@ def make_clifford_circuit(n, reversed_ag_toggles, backend):
     ]
     # Set all of the classical toggles before doing any gates
     cliff_circ.add_c_setbits(reversed_ag_toggles, bits)
+    # Add a barrier afterwards
+    # Not sure whether this is necessary,
+    # but I don't want the compiler to simplify the gates
+    cliff_circ.add_barrier(cliff_circ.bits)
 
     # Get the corresponding gates
     stab_gates = list(reversed(stabilizer_gate_list_ag(n)))
