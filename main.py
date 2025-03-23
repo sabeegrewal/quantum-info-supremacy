@@ -49,10 +49,11 @@ def run_optimization(job):
     }
 
 
+# I believe this is necessary on macs
 if __name__ == "__main__":
 
-    n = 4
-    depth = 4
+    n = 12
+    depth = 86
     noisy = True
     device_name = "H1-1LE"
     detect_leakage = False
@@ -137,8 +138,14 @@ if __name__ == "__main__":
                     "noisy": noisy,
                 }
             )
+
+        overall_start = time.time()
         with ProcessPoolExecutor() as executor:
             optimization_results = list(executor.map(run_optimization, jobs))
+        total_time = time.time() - overall_start
+        print(f"🔁 Total parallel optimization time: {total_time:.2f} seconds")
+        print("")
+
         # Make sure we preserve order (this shouldn't be needed, but doing to be extra safe)
         optimization_results.sort(key=lambda r: r["i"])
 
