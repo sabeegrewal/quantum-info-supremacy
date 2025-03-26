@@ -3,6 +3,7 @@ from optimize.optimize_jax import *
 from ansatz.ansatz_jax import *
 
 from utils import rand
+from utils.job_data import JobData
 from utils.process_io import await_job, print_results
 from utils.circuit import apply_clifford, make_clifford_circuit, stitch_circuits
 from utils.random_stabilizer import random_stabilizer_toggles_ag
@@ -52,8 +53,8 @@ def run_optimization(job):
 # I believe this is necessary on macs
 if __name__ == "__main__":
 
-    n = 12
-    depth = 86
+    n = 4
+    depth = 8
     noisy = True
     device_name = "H1-1LE"
     detect_leakage = False
@@ -62,7 +63,7 @@ if __name__ == "__main__":
     n_stitches = 5
     n_shots = 1
     start_seed = 0
-    n_jobs = 3
+    n_seeds = 5
 
     print("-" * 30)
     print(f"n               : {n}")
@@ -75,8 +76,8 @@ if __name__ == "__main__":
     print(f"n_shots         : {n_shots}")
     print("")
     print(f"start_seed      : {start_seed}")
-    print(f"n_jobs          : {n_jobs}")
-    print(f"n_submissions   : {int(np.ceil(n_jobs/n_stitches))}")
+    print(f"n_seeds          : {n_seeds}")
+    print(f"n_submissions   : {int(np.ceil(n_seeds/n_stitches))}")
     print("-" * 30)
 
     while True:
@@ -104,8 +105,8 @@ if __name__ == "__main__":
             else:
                 print("Invalid input. Please enter 'Y' or 'N'.")
 
-    for seed in range(start_seed, start_seed + n_jobs, n_stitches):
-        batch = list(range(seed, min(seed + n_stitches, start_seed + n_jobs)))
+    for seed in range(start_seed, start_seed + n_seeds, n_stitches):
+        batch = list(range(seed, min(seed + n_stitches, start_seed + n_seeds)))
         print(f"seeds: {batch}")
         random_bits_list = [rand.read_chunk(s) for s in batch]
         rand_gens = [rand.TrueRandom(random_bits) for random_bits in random_bits_list]
@@ -220,7 +221,7 @@ if __name__ == "__main__":
                 result = backend.run_circuit(overall_circ, n_shots=n_shots)
             else:
                 result_handle = backend.process_circuit(overall_circ, n_shots=n_shots)
-                job_data = job_data.JobData(
+                job_data = JobData(
                     n,
                     depth,
                     noisy,
