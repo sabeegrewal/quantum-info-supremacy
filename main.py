@@ -76,7 +76,7 @@ if __name__ == "__main__":
     print(f"n_shots         : {n_shots}")
     print("")
     print(f"start_seed      : {start_seed}")
-    print(f"n_seeds          : {n_seeds}")
+    print(f"n_seeds         : {n_seeds}")
     print(f"n_submissions   : {int(np.ceil(n_seeds/n_stitches))}")
     print("-" * 30)
 
