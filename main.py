@@ -29,11 +29,11 @@ def run_optimization(job):
     noisy = job["noisy"]
 
     # Ensure initial parameters are chosen consistently pseudorandomly
-    np.random.seed(s)
+    rng = np.random.default_rng(s)
 
     start = time.time()
 
-    opt = optimize(target_state, depth, noisy=noisy)
+    opt = optimize(target_state, depth, noisy=noisy, rng=rng)
     opt_params = opt.x
 
     out_state = output_state(n, opt_params)
@@ -50,11 +50,11 @@ def run_optimization(job):
     }
 
 
-# I believe this is necessary on macs
+# I believe this is necessary on macs for ProcessPoolExecutor
 if __name__ == "__main__":
 
-    n = 4
-    depth = 8
+    n = 12
+    depth = 86
     noisy = True
     device_name = "H1-1LE"
     detect_leakage = False
