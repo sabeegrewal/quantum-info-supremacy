@@ -10,6 +10,7 @@ from ansatz.ansatz_jax import *
 # Noise modeling
 # --------------
 
+
 def zzphase_fidelity(theta):
     """Approximate fidelity with which we can implement a ZZ gate with given parameter.
 
@@ -39,7 +40,8 @@ def zzphase_fidelity(theta):
     # The reason for the 5/4 and 3 is a (d+1)/d in going from average fidelity to process fidelity
     # For 2-qubit gates d = 4, for 1-qubit gates d = 2
     # Finally, we account for eps_mem twice, making 3/2 -> 3
-    return 1 - (5/4) * eps_tq - 3 * eps_mem
+    return 1 - (5 / 4) * eps_tq - 3 * eps_mem
+
 
 def zzphase_params(num_qubits, all_params):
     """Given a list of parameters to the ansatz circuit, identify the parameters
@@ -59,15 +61,16 @@ def zzphase_params(num_qubits, all_params):
     jax array
         A jax array of length `(num_qubits//2)*depth` containing all of the ZZ parameters.
     """
-    
+
     # Ignore the initial state parameters at the front
-    circ_params = all_params[2*num_qubits:]
+    circ_params = all_params[2 * num_qubits :]
     # Reshape the parameter array into blocks of the appropriate length for the repeated circuit
     reshaped_params = reshape_params_by_mod(num_qubits, circ_params)
 
     mod = depth_modulus(num_qubits)
     # In each row, the first (n // 2) * mod parameters correspond to ZZs
     return reshaped_params[:, : (num_qubits // 2) * mod].flatten()
+
 
 def fidelity_from_noise(num_qubits, all_params):
     """Given a parameterized ansatz circuit, compute an estimate of the multiplicative
@@ -93,10 +96,10 @@ def fidelity_from_noise(num_qubits, all_params):
     return jnp.prod(zzphase_fidelity(noisy_params))
 
 
-
 # --------------
 # Loss functions
 # --------------
+
 
 def loss(all_params, target_state):
     """Given a parameterized ansatz circuit and a target state, compute the loss function
@@ -121,6 +124,7 @@ def loss(all_params, target_state):
     out = output_state(num_qubits, all_params)
     return -abs(jnp.vdot(target_state, out)) ** 2
 
+
 def noisy_loss(all_params, target_state):
     """Given a parameterized ansatz circuit and a target state, compute the loss function
     for the ansatz circuit's output fidelity, assuming that the circuit is corrupted by
@@ -144,17 +148,18 @@ def noisy_loss(all_params, target_state):
     num_qubits = len(target_state.shape)
     return fidelity_from_noise(num_qubits, all_params) * loss(all_params, target_state)
 
+
 # jit-compiled functions computing loss and gradient simultaneously
 loss_and_grad = jax.jit(jax.value_and_grad(loss))
 noisy_loss_and_grad = jax.jit(jax.value_and_grad(noisy_loss))
-
 
 
 # ------------
 # Optimization
 # ------------
 
-def haar_u3_params():
+
+def haar_u3_params(rng):
     """
     Generate parameters for a Haar-random U3 gate.
 
@@ -171,13 +176,14 @@ def haar_u3_params():
     # See Section 2.3 of:
     # http://home.lu.lv/~sd20008/papers/essays/Random%20unitary%20[paper].pdf
     # sin^2(pi*theta/2) should be uniform in [0,1]
-    s2pt2 = np.random.uniform(0, 1)
+    s2pt2 = rng.uniform(0, 1)
     theta = 2 / np.pi * np.arcsin(np.sqrt(s2pt2))
-    phi = np.random.uniform(0, 2)
-    lamda = np.random.uniform(0, 2)
+    phi = rng.uniform(0, 2)
+    lamda = rng.uniform(0, 2)
     return (theta, phi, lamda)
 
-def random_init_params(num_qubits, depth):
+
+def random_init_params(num_qubits, depth, rng=np.random):
     """
     Randomly initialize parameters for an ansatz circuit of the given depth.
     In this initialization, the U3 and product state parameters are chosen
@@ -202,10 +208,12 @@ def random_init_params(num_qubits, depth):
 
     # First generate the product parameters
     # This means taking (theta, phi) but not lamda
-    product_params = np.concatenate([haar_u3_params()[:2] for i in range(num_qubits)])
+    product_params = np.concatenate(
+        [haar_u3_params(rng)[:2] for i in range(num_qubits)]
+    )
 
     # Then generate the U3 parameters
-    u3_params = np.concatenate([haar_u3_params() for i in range(2 * num_rzz_params)])
+    u3_params = np.concatenate([haar_u3_params(rng) for i in range(2 * num_rzz_params)])
     # Initialize all RZZ parameters to 0
     rzz_params = np.zeros(num_rzz_params)
 
@@ -216,6 +224,7 @@ def random_init_params(num_qubits, depth):
     circ_params = np.hstack((rzz_params_reshaped, u3_params_reshaped)).flatten()
     return np.concatenate((product_params, circ_params))
 
+
 def optimize(
     target_state,
     depth,
@@ -223,6 +232,7 @@ def optimize(
     noisy=False,
     maxiter=10000,
     init_params=None,
+    rng=np.random,
 ):
     """Optimize the ansatz circuit with respect to the target state.
 
@@ -256,14 +266,11 @@ def optimize(
         raise Exception("depth must be an integer multiple of depth_modulus")
 
     total_num_params = num_qubits * 2 + num_gate_params(num_qubits, depth)
-    # TODO do this with a seed
     if init_params is None:
-        init_params = random_init_params(num_qubits, depth)
+        init_params = random_init_params(num_qubits, depth, rng=rng)
     init_params = jnp.array(init_params)
     if init_params.shape != (total_num_params,):
-        raise Exception(
-            "init_params must be a 1D array of length num_params(depth)"
-        )
+        raise Exception("init_params must be a 1D array of length num_params(depth)")
 
     if noisy:
         value_and_grad = noisy_loss_and_grad
