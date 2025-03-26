@@ -49,11 +49,7 @@ def make_clifford_circuit(n, reversed_ag_toggles, backend):
     ]
     # Set all of the classical toggles before doing any gates
     cliff_circ.add_c_setbits(reversed_ag_toggles, bits)
-    # Add a barrier afterwards
-    # Not sure whether this is necessary,
-    # but I don't want the compiler to simplify the gates
-    cliff_circ.add_barrier(cliff_circ.bits)
-
+    
     # Get the corresponding gates
     stab_gates = list(reversed(stabilizer_gate_list_ag(n)))
 
@@ -191,7 +187,7 @@ def stitch_circuits(
     for circ_idx in range(num_circs):
         if circ_idx > 0:
             # After the first iteration, add a barrier and reset all qubits to 0
-            overall_circ.add_barrier(overall_circ.qubits + overall_circ.bits)
+            overall_circ.add_barrier(overall_circ.qubits)
             for i in range(n):
                 overall_circ.Reset(i)
 
@@ -209,7 +205,7 @@ def stitch_circuits(
                 overall_circ.append(leakage_gadget)
 
         # Barrier between state preparation and Clifford measurement
-        overall_circ.add_barrier(overall_circ.qubits + overall_circ.bits)
+        overall_circ.add_barrier(overall_circ.qubits)
 
         # Clifford
         overall_circ.append(cliff_circs[circ_idx])
