@@ -163,14 +163,17 @@ def haar_u3_params(rng):
     """
     Generate parameters for a Haar-random U3 gate.
 
+    Parameters
+    ----------
+    rng : numpy Generator
+        Random number generator to use for sampling.
+
     Returns
     -------
     (real, real, real)
         (theta, phi, lamda) distributed such that u3(theta, phi, lambda)
         equals the one-qubit unitary Haar measure, up to global phase.
     """
-
-    # TODO: optionally take a seed as input
 
     # This method uses properties of the Euler angle parametrization of SU(2)
     # See Section 2.3 of:
@@ -195,6 +198,9 @@ def random_init_params(num_qubits, depth, rng=np.random):
         Number of qubits in the circuit.
     depth : int
         Depth of the ansatz circuit, as measured by number of two-qubit layers.
+    rng : numpy Generator
+        Random number generator to use for sampling.
+        Defaults to `np.random`.
 
     Returns
     -------
@@ -254,6 +260,9 @@ def optimize(
         If provided, the initial parameters for the ansatz circuit.
         Must have length `2 * n + num_gate_params(n, depth)`.
         If `None`, the initial parameters are chosen randomly.
+    rng : numpy Generator
+        Random number generator to use for sampling, if `init_params` not provided.
+        Defaults to `np.random`.
 
     Returns
     -------
