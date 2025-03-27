@@ -3,6 +3,8 @@
 randomness/
 # Save location for jobs submitted to Quantinuum
 job_handles/
+# Save location for logs
+logs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
