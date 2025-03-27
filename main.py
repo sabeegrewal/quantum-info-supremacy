@@ -16,7 +16,9 @@ from pytket.extensions.quantinuum.backends.credential_storage import (
 
 import numpy as np
 import time
+from datetime import datetime
 import pathlib
+import logging
 from concurrent.futures import ProcessPoolExecutor
 
 
@@ -65,49 +67,39 @@ if __name__ == "__main__":
     start_seed = 0
     n_seeds = 1600
 
-    print("-" * 30)
-    print(f"n               : {n}")
-    print(f"depth           : {depth}")
-    print(f"noisy           : {noisy}")
-    print(f"device_name     : {device_name}")
-    print(f"detect_leakage  : {detect_leakage}")
-    print(f"submit_job      : {submit_job}")
-    print(f"n_stitches      : {n_stitches}")
-    print(f"n_shots         : {n_shots}")
-    print("")
-    print(f"start_seed      : {start_seed}")
-    print(f"n_seeds         : {n_seeds}")
-    print(f"n_submissions   : {n_seeds // n_stitches + bool(n_seeds % n_stitches)}")
-    print("-" * 30)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_path = f"logs/{device_name}/n_{n}_depth_{depth}"
+    pathlib.Path(log_path).mkdir(parents=True, exist_ok=True)
+    log_filename = (
+        f"{log_path}/seeds_{start_seed}-{start_seed+n_seeds-1}_{timestamp}.txt"
+    )
+    logging.basicConfig(
+        filename=log_filename,
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
-    while True:
-        user_input = input("Enter 'Y' to continue or 'N' to exit: ").strip().lower()
-        if user_input == "y":
-            print("Continuing...")
-            break
-        elif user_input == "n":
-            print("Exiting...")
-            exit()
-        else:
-            print("Invalid input. Please enter 'Y' or 'N'.")
-
-    # Double check...
-    if device_name == "H1-1":
-        print(f"Are you sure? You are submitting to the real machine!")
-        while True:
-            user_input = input("Enter 'Y' to continue or 'N' to exit: ").strip().lower()
-            if user_input == "y":
-                print("Continuing...")
-                break
-            elif user_input == "n":
-                print("Exiting...")
-                exit()
-            else:
-                print("Invalid input. Please enter 'Y' or 'N'.")
+    logging.info("-" * 30)
+    logging.info(f"n               : {n}")
+    logging.info(f"depth           : {depth}")
+    logging.info(f"noisy           : {noisy}")
+    logging.info(f"device_name     : {device_name}")
+    logging.info(f"detect_leakage  : {detect_leakage}")
+    logging.info(f"submit_job      : {submit_job}")
+    logging.info(f"n_stitches      : {n_stitches}")
+    logging.info(f"n_shots         : {n_shots}")
+    logging.info("")
+    logging.info(f"start_seed      : {start_seed}")
+    logging.info(f"n_seeds         : {n_seeds}")
+    logging.info(
+        f"n_submissions   : {n_seeds // n_stitches + bool(n_seeds % n_stitches)}"
+    )
+    logging.info("-" * 30)
 
     for seed in range(start_seed, start_seed + n_seeds, n_stitches):
         batch = list(range(seed, min(seed + n_stitches, start_seed + n_seeds)))
-        print(f"seeds: {batch}")
+        logging.info(f"seeds: {batch}")
         random_bits_list = [rand.read_chunk(s) for s in batch]
         rand_gens = [rand.TrueRandom(random_bits) for random_bits in random_bits_list]
 
@@ -122,9 +114,7 @@ if __name__ == "__main__":
         ag_toggle_lists = [
             random_stabilizer_toggles_ag(n, rand_gen) for rand_gen in rand_gens
         ]
-        reversed_ag_toggle_lists = [
-            list(reversed(lst)) for lst in ag_toggle_lists
-        ]
+        reversed_ag_toggle_lists = [list(reversed(lst)) for lst in ag_toggle_lists]
 
         # Optimize
         jobs = []
@@ -144,8 +134,8 @@ if __name__ == "__main__":
         with ProcessPoolExecutor() as executor:
             optimization_results = list(executor.map(run_optimization, jobs))
         total_time = time.time() - overall_start
-        print(f"🔁 Total parallel optimization time: {total_time:.2f} seconds")
-        print("")
+        logging.info(f"🔁 Total parallel optimization time: {total_time:.2f} seconds")
+        logging.info("")
 
         # Make sure we preserve order (this shouldn't be needed, but doing to be extra safe)
         optimization_results.sort(key=lambda r: r["i"])
@@ -155,13 +145,13 @@ if __name__ == "__main__":
         noisy_fidelities = [r["noise_fidelity"] for r in optimization_results]
 
         for r in optimization_results:
-            print(f"Noiseless fidelity: {r['noiseless_fidelity']}")
-            print(f"Estimated fidelity due to noise: {r['noise_fidelity']}")
-            print(
+            logging.info(f"Noiseless fidelity: {r['noiseless_fidelity']}")
+            logging.info(f"Estimated fidelity due to noise: {r['noise_fidelity']}")
+            logging.info(
                 f"Estimated overall fidelity: {r['noise_fidelity'] * r['noiseless_fidelity']}"
             )
-            print(f"Optimization time: {r['time']}")
-            print("")
+            logging.info(f"Optimization time: {r['time']}")
+            logging.info("")
 
         if device_name == "H1-1LE":
             api_offline = QuantinuumAPIOffline()
@@ -181,20 +171,15 @@ if __name__ == "__main__":
             for opt_params in opt_param_lists
         ]
         cliff_circs = [
-            make_clifford_circuit(n, lst, backend)
-            for lst in reversed_ag_toggle_lists
+            make_clifford_circuit(n, lst, backend) for lst in reversed_ag_toggle_lists
         ]
         scoring_states = [
             apply_clifford(target_state, lst)
-            for target_state, lst in zip(
-                target_states, reversed_ag_toggle_lists
-            )
+            for target_state, lst in zip(target_states, reversed_ag_toggle_lists)
         ]
         cliff_output_states = [
             apply_clifford(output_state, lst)
-            for output_state, lst in zip(
-                output_states, reversed_ag_toggle_lists
-            )
+            for output_state, lst in zip(output_states, reversed_ag_toggle_lists)
         ]
 
         basis_xebs = [
@@ -203,11 +188,11 @@ if __name__ == "__main__":
                 scoring_states, cliff_output_states
             )
         ]
-        print(f"Noiseless basis XEB: {[float(xeb) for xeb in basis_xebs]}")
-        print(
+        logging.info(f"Noiseless basis XEB: {[float(xeb) for xeb in basis_xebs]}")
+        logging.info(
             f"Est. noisy basis XEB: {[float(basis_xeb * nf) for basis_xeb, nf in zip(basis_xebs, noisy_fidelities)]}"
         )
-        print("")
+        logging.info("")
 
         overall_circ = stitch_circuits(
             state_prep_circs,
@@ -235,5 +220,5 @@ if __name__ == "__main__":
                     result_handle,
                 )
                 save_path = f"job_handles/{device_name}/n_{n}_depth_{depth}"
-                pathlib.Path(save_path).mkdir(parents=True, exist_ok=True) 
+                pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
                 job_data.save(filename=f"{save_path}/seeds_{batch[0]}-{batch[-1]}.txt")
