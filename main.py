@@ -38,14 +38,14 @@ def run_optimization(job):
 
     out_state = output_state(n, opt_params)
     noiseless_fidelity = -loss(opt_params, target_state)
-    noisy_fidelity = fidelity_from_noise(n, opt_params)
+    noise_fidelity = fidelity_from_noise(n, opt_params)
 
     return {
         "i": i,
         "opt_params": opt_params,
         "output_state": out_state,
         "noiseless_fidelity": noiseless_fidelity,
-        "noisy_fidelity": noisy_fidelity,
+        "noise_fidelity": noise_fidelity,
         "time": time.time() - start,
     }
 
@@ -119,11 +119,11 @@ if __name__ == "__main__":
             for target_state_r, target_state_i in zip(target_states_r, target_states_i)
         ]
 
-        ag_toggles_list = [
+        ag_toggle_lists = [
             random_stabilizer_toggles_ag(n, rand_gen) for rand_gen in rand_gens
         ]
-        reversed_ag_toggles_list = [
-            list(reversed(ag_toggles)) for ag_toggles in ag_toggles_list
+        reversed_ag_toggle_lists = [
+            list(reversed(lst)) for lst in ag_toggle_lists
         ]
 
         # Optimize
@@ -151,14 +151,14 @@ if __name__ == "__main__":
         optimization_results.sort(key=lambda r: r["i"])
 
         output_states = [r["output_state"] for r in optimization_results]
-        opt_params_list = [r["opt_params"] for r in optimization_results]
-        noisy_fidelities = [r["noisy_fidelity"] for r in optimization_results]
+        opt_param_lists = [r["opt_params"] for r in optimization_results]
+        noisy_fidelities = [r["noise_fidelity"] for r in optimization_results]
 
         for r in optimization_results:
             print(f"Noiseless fidelity: {r['noiseless_fidelity']}")
-            print(f"Estimated fidelity due to noise: {r['noisy_fidelity']}")
+            print(f"Estimated fidelity due to noise: {r['noise_fidelity']}")
             print(
-                f"Estimated overall fidelity: {r['noisy_fidelity'] * r['noiseless_fidelity']}"
+                f"Estimated overall fidelity: {r['noise_fidelity'] * r['noiseless_fidelity']}"
             )
             print(f"Optimization time: {r['time']}")
             print("")
@@ -178,22 +178,22 @@ if __name__ == "__main__":
 
         state_prep_circs = [
             make_ansatz_circuit(n, opt_params, method="pytket")
-            for opt_params in opt_params_list
+            for opt_params in opt_param_lists
         ]
         cliff_circs = [
-            make_clifford_circuit(n, reversed_ag_toggles, backend)
-            for reversed_ag_toggles in reversed_ag_toggles_list
+            make_clifford_circuit(n, lst, backend)
+            for lst in reversed_ag_toggle_lists
         ]
         scoring_states = [
-            apply_clifford(target_state, reversed_ag_toggles)
-            for target_state, reversed_ag_toggles in zip(
-                target_states, reversed_ag_toggles_list
+            apply_clifford(target_state, lst)
+            for target_state, lst in zip(
+                target_states, reversed_ag_toggle_lists
             )
         ]
         cliff_output_states = [
-            apply_clifford(output_state, reversed_ag_toggles)
-            for output_state, reversed_ag_toggles in zip(
-                output_states, reversed_ag_toggles_list
+            apply_clifford(output_state, lst)
+            for output_state, lst in zip(
+                output_states, reversed_ag_toggle_lists
             )
         ]
 
@@ -229,8 +229,8 @@ if __name__ == "__main__":
                     detect_leakage,
                     batch,
                     target_states,
-                    reversed_ag_toggles_list,
-                    opt_params_list,
+                    reversed_ag_toggle_lists,
+                    opt_param_lists,
                     overall_circ,
                     result_handle,
                 )
