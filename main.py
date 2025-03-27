@@ -4,7 +4,6 @@ from ansatz.ansatz_jax import *
 
 from utils import rand
 from utils.job_data import JobData
-from utils.process_io import await_job, print_results
 from utils.circuit import apply_clifford, make_clifford_circuit, stitch_circuits
 from utils.random_stabilizer import random_stabilizer_toggles_ag
 
@@ -17,6 +16,7 @@ from pytket.extensions.quantinuum.backends.credential_storage import (
 
 import numpy as np
 import time
+import pathlib
 from concurrent.futures import ProcessPoolExecutor
 
 
@@ -56,14 +56,14 @@ if __name__ == "__main__":
     n = 12
     depth = 86
     noisy = True
-    device_name = "H1-1LE"
+    device_name = "H1-1"
     detect_leakage = False
 
     submit_job = True
     n_stitches = 5
     n_shots = 1
     start_seed = 0
-    n_seeds = 5
+    n_seeds = 1600
 
     print("-" * 30)
     print(f"n               : {n}")
@@ -234,7 +234,6 @@ if __name__ == "__main__":
                     overall_circ,
                     result_handle,
                 )
-                job_data.save()
-                result = await_job(backend, result_handle)
-
-            print_results(scoring_states, detect_leakage, result)
+                save_path = f"job_handles/{device_name}/n_{n}_depth_{depth}"
+                pathlib.Path(save_path).mkdir(parents=True, exist_ok=True) 
+                job_data.save(filename=f"{save_path}/seeds_{batch[0]}-{batch[-1]}.txt")
