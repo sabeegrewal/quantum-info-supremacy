@@ -43,8 +43,8 @@ def await_job(backend, result_handle, sleep=20, trials=1000):
     return result
 
 
-def print_results(scoring_states, detect_leakage, result):
-    """Compute and print XEB scores from the results on the given scoring states.
+def get_xeb_scores(scoring_states, detect_leakage, result):
+    """Compute the XEB scores from the results on the given scoring states.
 
     Parameters
     ----------
@@ -54,10 +54,17 @@ def print_results(scoring_states, detect_leakage, result):
         Whether to the leakage detection gadget was used.
     result : BackendResult
         Result containing samples from the output distribution.
+
+    Returns
+    -------
+    list[list[real]]
+        A list of lists of XEB scores corresponding to the shots from each state,
+        with pruning of all shots detected as leaky.
     """
 
     n = len(scoring_states[0].shape)
 
+    all_scores = []
     for circ_idx in range(len(scoring_states)):
         # The bits that were measured in each shot
         measured_bits = [Bit(f"measurement{circ_idx}", i) for i in range(n)]
@@ -66,23 +73,16 @@ def print_results(scoring_states, detect_leakage, result):
                 Bit(f"leakage_detection{circ_idx}", i) for i in range(n)
             ]
         all_shots_with_leakage_results = result.get_shots(cbits=measured_bits)
-        all_shots = [shot[:n] for shot in all_shots_with_leakage_results]
+        
         # Prunes all shots detected as leaky
         pruned_shots = [
             shot[:n] for shot in all_shots_with_leakage_results if not any(shot[n:])
         ]
-
-        xeb_scores = [
-            abs(scoring_states[circ_idx][tuple(shot)]) ** 2 * 2**n - 1
-            for shot in all_shots
-        ]
+        
         pruned_xeb_scores = [
             abs(scoring_states[circ_idx][tuple(shot)]) ** 2 * 2**n - 1
             for shot in pruned_shots
         ]
 
-        observed_xeb = sum(xeb_scores) / len(xeb_scores)
-        pruned_xeb = sum(pruned_xeb_scores) / len(pruned_xeb_scores)
-
-        print(f"Observed XEB: {observed_xeb}")
-        print(f"Observed pruned XEB: {pruned_xeb}")
+        all_scores.append(pruned_xeb_scores)
+    return all_scores
