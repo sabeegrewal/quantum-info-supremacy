@@ -229,4 +229,6 @@ if __name__ == "__main__":
                 )
                 save_path = f"job_handles/{device_name}/n_{n}_depth_{depth}"
                 pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
-                job_data.save(filename=f"{save_path}/seeds_{batch[0]}-{batch[-1]}.txt")
+                job_data.save(
+                    filename=f"{save_path}/seeds_{batch[0]}-{batch[-1]}_{timestamp}.txt"
+                )
