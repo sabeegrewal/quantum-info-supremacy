@@ -78,36 +78,33 @@ class JobData:
             )
             filename = f"job_handles/{self.n}_{self.depth}_{time_str}.txt"
 
-        file = open(filename, "w")
-        file.write(str(self.n) + "\n")
-        file.write(str(self.depth) + "\n")
-        file.write(str(self.noisy) + "\n")
-        file.write(self.device_name + "\n")
-        file.write(str(self.detect_leakage) + "\n")
-        file.write(str(self.seeds) + "\n")
-        file.write(str(self.target_states.tolist()) + "\n")
-        file.write(str(self.reversed_ag_toggle_lists) + "\n")
-        file.write(str(self.opt_param_lists.tolist()) + "\n")
-        file.write(json.dumps(self.overall_circ.to_dict()) + "\n")
-        file.write(str(self.result_handle) + "\n")
-        file.close()
+        with open(filename, "w") as file:
+            file.write(str(self.n) + "\n")
+            file.write(str(self.depth) + "\n")
+            file.write(str(self.noisy) + "\n")
+            file.write(self.device_name + "\n")
+            file.write(str(self.detect_leakage) + "\n")
+            file.write(str(self.seeds) + "\n")
+            file.write(str(self.target_states.tolist()) + "\n")
+            file.write(str(self.reversed_ag_toggle_lists) + "\n")
+            file.write(str(self.opt_param_lists.tolist()) + "\n")
+            file.write(json.dumps(self.overall_circ.to_dict()) + "\n")
+            file.write(str(self.result_handle) + "\n")
 
     @staticmethod
     def load(filename):
-        file = open(filename, "r")
-
-        n = int(file.readline()[:-1])
-        depth = int(file.readline()[:-1])
-        noisy = file.readline()[:-1] == "True"
-        device_name = file.readline()[:-1]
-        detect_leakage = file.readline()[:-1] == "True"
-        # TODO ideally something safer than running eval()...
-        seeds = eval(file.readline()[:-1])
-        target_states = np.array(eval(file.readline()[:-1]))
-        reversed_ag_toggle_lists = eval(file.readline()[:-1])
-        opt_param_lists = np.array(eval(file.readline()[:-1]))
-        overall_circ = Circuit.from_dict(json.loads(file.readline()[:-1]))
-        result_handle = ResultHandle.from_str(file.readline()[:-1])
+        with open(filename, "r") as file:
+            n = int(file.readline().strip())
+            depth = int(file.readline().strip())
+            noisy = file.readline().strip() == "True"
+            device_name = file.readline().strip()
+            detect_leakage = file.readline().strip() == "True"
+            seeds = eval(file.readline().strip())
+            target_states = np.array(eval(file.readline().strip()))
+            reversed_ag_toggle_lists = eval(file.readline().strip())
+            opt_param_lists = np.array(eval(file.readline().strip()))
+            overall_circ = Circuit.from_dict(json.loads(file.readline().strip()))
+            result_handle = ResultHandle.from_str(file.readline().strip())
 
         return JobData(
             n,

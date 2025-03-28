@@ -21,6 +21,10 @@ import pathlib
 import logging
 from concurrent.futures import ProcessPoolExecutor
 
+# This is necssary for platforms that run os.fork() by default in the ProcessPoolExectuor
+# It is not necssasry on macOS, but it is on certain Linux platforms.
+# import multiprocessing
+
 
 def run_optimization(job):
     i = job["i"]
@@ -55,6 +59,10 @@ def run_optimization(job):
 # I believe this is necessary on macs for ProcessPoolExecutor
 if __name__ == "__main__":
 
+    # This is necssary for platforms that run os.fork() by default in the ProcessPoolExectuor
+    # It is not necssasry on macOS, but it is on certain Linux platforms.
+    # multiprocessing.set_start_method("spawn")
+
     n = 12
     depth = 86
     noisy = True
@@ -65,7 +73,7 @@ if __name__ == "__main__":
     n_stitches = 5
     n_shots = 1
     start_seed = 0
-    n_seeds = 1600
+    n_seeds = 5
 
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_path = f"logs/{device_name}/n_{n}_depth_{depth}"
