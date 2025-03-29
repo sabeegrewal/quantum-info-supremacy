@@ -70,11 +70,11 @@ if __name__ == "__main__":
     detect_leakage = False
 
     submit_job = True
-    n_stitches = 5
-    n_parallel = 5
+    n_stitches = 2
+    n_parallel = 8
     n_shots = 1
     start_seed = 0
-    n_seeds = 5
+    n_seeds = 1600
 
     assert n_parallel % n_stitches == 0
 
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     logging.info("-" * 30)
 
     for seed in range(start_seed, start_seed + n_seeds, n_parallel):
-        batch = list(range(seed, min(seed + n_stitches, start_seed + n_seeds)))
+        batch = list(range(seed, min(seed + n_parallel, start_seed + n_seeds)))
         logging.info(f"processing seeds: {batch}")
         random_bits_list = [rand.read_chunk(s) for s in batch]
         rand_gens = [rand.TrueRandom(random_bits) for random_bits in random_bits_list]
@@ -206,19 +206,17 @@ if __name__ == "__main__":
         )
         logging.info("")
 
-        def chunk_list(lst, chunk_size):
-            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
-
-        overall_circs = [
-            stitch_circuits(state_prep_chunk, cliff_circ_chunk, backend, detect_leakage)
-            for state_prep_chunk, cliff_circ_chunk in zip(
-                chunk_list(state_prep_circs, n_stitches),
-                chunk_list(cliff_circs, n_stitches),
+        # Use len(batch) in case we're at the end
+        # and n_parallel does not divide n_seeds
+        for i in range(0, len(batch), n_stitches):
+            overall_circ = stitch_circuits(
+                state_prep_circs[i:i+n_stitches],
+                cliff_circs[i:i+n_stitches],
+                backend,
+                detect_leakage
             )
-        ]
 
-        if submit_job:
-            for overall_circ in overall_circs:
+            if submit_job:
                 if device_name == "H1-1LE":
                     result = backend.run_circuit(overall_circ, n_shots=n_shots)
                 else:
@@ -231,15 +229,15 @@ if __name__ == "__main__":
                         noisy,
                         device_name,
                         detect_leakage,
-                        batch,
-                        target_states,
-                        reversed_ag_toggle_lists,
-                        opt_param_lists,
+                        batch[i:i+n_stitches],
+                        target_states[i:i+n_stitches],
+                        reversed_ag_toggle_lists[i:i+n_stitches],
+                        opt_param_lists[i:i+n_stitches],
                         overall_circ,
                         result_handle,
                     )
                     save_path = f"job_handles/{device_name}/n_{n}_depth_{depth}"
                     pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
                     job_data.save(
-                        filename=f"{save_path}/seeds_{batch[0]}-{batch[-1]}_{timestamp}.txt"
+                        filename=f"{save_path}/seeds_{batch[i]}-{batch[i:i+n_stitches][-1]}_{timestamp}.txt"
                     )
