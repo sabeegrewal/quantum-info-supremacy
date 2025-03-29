@@ -5,6 +5,7 @@ from pytket.backends.resulthandle import ResultHandle
 import time
 import json
 import numpy as np
+import ast
 
 
 class JobData:
@@ -99,10 +100,10 @@ class JobData:
             noisy = file.readline().strip() == "True"
             device_name = file.readline().strip()
             detect_leakage = file.readline().strip() == "True"
-            seeds = eval(file.readline().strip())
-            target_states = np.array(eval(file.readline().strip()))
-            reversed_ag_toggle_lists = eval(file.readline().strip())
-            opt_param_lists = np.array(eval(file.readline().strip()))
+            seeds = ast.literal_eval(file.readline().strip())
+            target_states = np.array(ast.literal_eval(file.readline().strip()))
+            reversed_ag_toggle_lists = ast.literal_eval(file.readline().strip())
+            opt_param_lists = np.array(ast.literal_eval(file.readline().strip()))
             overall_circ = Circuit.from_dict(json.loads(file.readline().strip()))
             result_handle = ResultHandle.from_str(file.readline().strip())
 
