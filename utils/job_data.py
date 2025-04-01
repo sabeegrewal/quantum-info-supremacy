@@ -102,7 +102,12 @@ class JobData:
             detect_leakage = file.readline().strip() == "True"
             seeds = ast.literal_eval(file.readline().strip())
             target_states = np.array(ast.literal_eval(file.readline().strip()))
-            reversed_ag_toggle_lists = ast.literal_eval(file.readline().strip())
+            # In some previous versions of the code, numpy and python bools printed differently
+            # E.g. True would be printed as "np.True_"
+            # The purpose of this code is to allow parsing of either format for the toggles
+            untrimmed_lit = file.readline().strip()
+            trimmed_lit = untrimmed_lit.replace("np.", "").replace("_", "")
+            reversed_ag_toggle_lists = ast.literal_eval(trimmed_lit)
             opt_param_lists = np.array(ast.literal_eval(file.readline().strip()))
             overall_circ = Circuit.from_dict(json.loads(file.readline().strip()))
             result_handle = ResultHandle.from_str(file.readline().strip())
