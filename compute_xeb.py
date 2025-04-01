@@ -8,25 +8,17 @@ from pytket.extensions.quantinuum.backends.credential_storage import (
     QuantinuumConfigCredentialStorage,
 )
 
+import os
 import numpy as np
 
 n = 12
 depth = 86
 device_name = "H1-1"
-n_stitches = 5
-
-start_seed = 0
-n_seeds = 1600
 
 print("-" * 30)
 print(f"n               : {n}")
 print(f"depth           : {depth}")
 print(f"device_name     : {device_name}")
-print(f"n_stitches      : {n_stitches}")
-print("")
-print(f"start_seed      : {start_seed}")
-print(f"n_seeds         : {n_seeds}")
-print(f"n_submissions   : {n_seeds // n_stitches + bool(n_seeds % n_stitches)}")
 print("-" * 30)
 
 while True:
@@ -52,13 +44,14 @@ else:
             token_store=QuantinuumConfigCredentialStorage()
         ),
     )
-save_path = f"job_handles/{device_name}/n_{n}_depth_{depth}"
+save_path = f"job_handles/{device_name}/n_{n}_depth_{depth}/"
+filenames = os.listdir(save_path)
+txt_filenames = [fn for fn in filenames if fn[-4:] == ".txt"]
+job_datas = [JobData.load(save_path + fn) for fn in txt_filenames]
+job_datas.sort(key=lambda jd: jd.seeds)
 
 all_scores = []
-for seed in range(start_seed, start_seed + n_seeds, n_stitches):
-    batch = list(range(seed, min(seed + n_stitches, start_seed + n_seeds)))
-    job_data = JobData.load(f"{save_path}/seeds_{batch[0]}-{batch[-1]}.txt")
-
+for job_data in job_datas:
     scoring_states = [
         apply_clifford(target_state, lst)
         for target_state, lst in zip(
