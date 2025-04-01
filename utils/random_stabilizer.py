@@ -249,7 +249,8 @@ def random_stabilizer_toggles(n, rand_gen=np.random):
                     and mat[leading_qubits.index(i)][j]
                 )
                 # leading_qubits.index(i) looks up the row corresponding to i
-    return result
+    # Cast everything to a python bool for consistency
+    return [bool(b) for b in result]
 
 
 def num_stab_gates_ag(n):
@@ -380,4 +381,5 @@ def random_stabilizer_toggles_ag(n, rand_gen=np.random):
     for i in range(n):
         # Hadamard the qubits without a leading 1
         result.append(i not in leading_qubits)
-    return result
+    # Cast everything to a python bool for consistency
+    return [bool(b) for b in result]
