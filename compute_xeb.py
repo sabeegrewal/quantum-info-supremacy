@@ -60,8 +60,9 @@ for job_data in job_datas:
     ]
 
     result, job_status = backend.get_partial_result(job_data.result_handle)
-    scores = get_xeb_scores(scoring_states, job_data.detect_leakage, result)
-    all_scores.extend([x for lst in scores for x in lst])
+    if result is not None:
+        scores = get_xeb_scores(scoring_states, job_data.detect_leakage, result)
+        all_scores.extend([x for lst in scores for x in lst])
 
 print(f"Number of shots: {len(all_scores)}")
 print(f"Average XEB: {np.mean(all_scores)}")
