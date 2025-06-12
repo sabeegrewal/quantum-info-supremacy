@@ -43,8 +43,9 @@ def await_job(backend, result_handle, sleep=20, trials=1000):
     return result
 
 
-def get_xeb_scores(scoring_states, detect_leakage, result):
-    """Compute the XEB scores from the results on the given scoring states.
+def get_shots_and_xeb_scores(scoring_states, detect_leakage, result):
+    """Get the shots and compute the XEB scores from the results on the
+    given scoring states.
 
     Parameters
     ----------
@@ -57,9 +58,9 @@ def get_xeb_scores(scoring_states, detect_leakage, result):
 
     Returns
     -------
-    list[list[real]]
-        A list of lists of XEB scores corresponding to the shots from each state,
-        with pruning of all shots detected as leaky.
+    list[list[(str, real)]]
+        A list of lists of pairs of (shot, XEB score) corresponding to the
+        shots from each state, with pruning of all shots detected as leaky.
     """
 
     n = len(scoring_states[0].shape)
@@ -79,10 +80,13 @@ def get_xeb_scores(scoring_states, detect_leakage, result):
             shot[:n] for shot in all_shots_with_leakage_results if not any(shot[n:])
         ]
         
-        pruned_xeb_scores = [
-            abs(scoring_states[circ_idx][tuple(shot)]) ** 2 * 2**n - 1
+        pruned_shots_and_xeb_scores = [
+            (
+                "".join(str(bit) for bit in shot),
+                abs(scoring_states[circ_idx][tuple(shot)]) ** 2 * 2**n - 1
+            )
             for shot in pruned_shots
         ]
 
-        all_scores.append(pruned_xeb_scores)
+        all_scores.append(pruned_shots_and_xeb_scores)
     return all_scores
