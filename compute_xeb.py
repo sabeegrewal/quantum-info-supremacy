@@ -9,6 +9,7 @@ from pytket.extensions.quantinuum.backends.credential_storage import (
     QuantinuumConfigCredentialStorage,
 )
 
+import time
 import os
 import numpy as np
 
