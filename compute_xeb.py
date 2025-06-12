@@ -1,7 +1,8 @@
 from utils.job_data import JobData
-from utils.process_io import await_job, get_xeb_scores
+from utils.process_io import await_job, get_shots_and_xeb_scores
 from utils.circuit import apply_clifford
 
+from pytket import Bit
 from pytket.extensions.quantinuum import QuantinuumBackend, QuantinuumAPIOffline
 from pytket.extensions.quantinuum.backends.api_wrappers import QuantinuumAPI
 from pytket.extensions.quantinuum.backends.credential_storage import (
@@ -50,19 +51,32 @@ txt_filenames = [fn for fn in filenames if fn[-4:] == ".txt"]
 job_datas = [JobData.load(save_path + fn) for fn in txt_filenames]
 job_datas.sort(key=lambda jd: jd.seeds)
 
-all_scores = []
-for job_data in job_datas:
-    scoring_states = [
-        apply_clifford(target_state, lst)
-        for target_state, lst in zip(
-            job_data.target_states, job_data.reversed_ag_toggle_lists
-        )
-    ]
+# Now save the data
+time_str = (
+    time.asctime().replace("/", "_").replace(":", "-").replace(" ", "_")
+)
+filename = f"data/shots_{device_name}_{n}_{depth}_{time_str}.csv"
+with open(filename, "w") as file:
+    file.write("Seed,Shot,Score\n")
+    
+    all_scores = []
+    for job_data in job_datas:
+        scoring_states = [
+            apply_clifford(target_state, lst)
+            for target_state, lst in zip(
+                job_data.target_states, job_data.reversed_ag_toggle_lists
+            )
+        ]
 
-    result, job_status = backend.get_partial_result(job_data.result_handle)
-    if result is not None:
-        scores = get_xeb_scores(scoring_states, job_data.detect_leakage, result)
-        all_scores.extend([x for lst in scores for x in lst])
+        result, job_status = backend.get_partial_result(job_data.result_handle)
+        if result is not None:
+            shots_and_scores_by_seed = get_shots_and_xeb_scores(scoring_states, job_data.detect_leakage, result)
+            for circ_idx in range(len(job_data.seeds)):
+                seed = job_data.seeds[circ_idx]
+                shots_and_scores = shots_and_scores_by_seed[circ_idx]
+                for shot, score in shots_and_scores:
+                    all_scores.append(score)
+                    file.write(f"{seed},{shot},{score}\n")
 
 print(f"Number of shots: {len(all_scores)}")
 print(f"Average XEB: {np.mean(all_scores)}")
