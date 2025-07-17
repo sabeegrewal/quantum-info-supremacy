@@ -28,7 +28,7 @@ plt.plot(myrange, haar_comm, color="#30A08E", linestyle="--",
 plt.plot(myrange, cliff_comm, color="#30A08E", linestyle="--",
          linewidth=1, marker="s", label="DXHOG, Clifford")
 plt.plot(myrange, hm_comm, color="#8064A2", linestyle="--",
-         linewidth=1, marker="o", label="HM")
+         linewidth=1, marker="d", label="HM")
 plt.xlabel("Number of noiseless qubits, $n$")
 plt.ylabel("Lower bound on bits of classical communication to spoof, $m$")
 plt.yscale("log", base=2)
