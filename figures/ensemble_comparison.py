@@ -23,7 +23,7 @@ plt.plot(myrange, cliff_xebs, color="#30A08E", linewidth=1.5, label="Clifford")
 #plt.plot(myrange[:11], prod_xebs, color="#FF9A56", linewidth=2, label="Product Clifford")
 plt.xlabel("Bits of classical communication, $m$")
 plt.ylabel("Maximum achievable XEB, $\epsilon$")
-plt.xlim((0,400))
+plt.xlim((0,375))
 plt.ylim((0,1))
 plt.legend()
 
