@@ -17,8 +17,8 @@ design_xebs = [max_classical_xeb_jit(x, 12, "design") for x in myrange]
 cliff_xebs = [max_classical_xeb_jit(x, 12, "cliff") for x in myrange]
 
 #prod_xebs = [max_classical_xeb_jit(x, 12, "cliff_prod") for x in myrange[:11]]
-plt.plot(myrange, haar_xebs, color="#E75D72", linewidth=1.5, label="Haar")
-plt.plot(myrange, design_xebs, color="#8064A2", linewidth=1.5, label="$10$-design")
+plt.plot(myrange, haar_xebs, color="#E75D72", linewidth=1.5, linestyle="--", label="Haar")
+plt.plot(myrange, design_xebs, color="#8064A2", linewidth=1.5, linestyle="-.", label="$10$-design")
 plt.plot(myrange, cliff_xebs, color="#30A08E", linewidth=1.5, label="Clifford")
 #plt.plot(myrange[:11], prod_xebs, color="#FF9A56", linewidth=2, label="Product Clifford")
 plt.xlabel("Bits of classical communication, $m$")
