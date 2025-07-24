@@ -1,7 +1,7 @@
 from pytket import Bit
 
 import time
-
+import numpy as np
 
 def await_job(backend, result_handle, sleep=20, trials=1000):
     """Retrieve a job from the server, waiting until completed.
@@ -83,7 +83,7 @@ def get_shots_and_xeb_scores(scoring_states, detect_leakage, result):
         pruned_shots_and_xeb_scores = [
             (
                 "".join(str(bit) for bit in shot),
-                abs(scoring_states[circ_idx][tuple(shot)]) ** 2 * 2**n - 1
+                abs(scoring_states[circ_idx][tuple(shot)])**2 * 2**n / (np.linalg.norm(scoring_states[0])**2) - 1
             )
             for shot in pruned_shots
         ]
