@@ -39,5 +39,6 @@ order = [1, 2, 3, 0]
 plt.legend([handles[i] for i in order], [labels[i] for i in order])
 plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
 
-plt.savefig("noiseless_bound.pdf")
+# 'tight' removes whitespace
+plt.savefig("noiseless_bound.pdf", bbox_inches='tight')
 plt.show()

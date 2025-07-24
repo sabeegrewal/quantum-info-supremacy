@@ -33,5 +33,6 @@ order = [2, 1, 0]
 plt.legend([handles[i] for i in order], [labels[i] for i in order])
 plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
 
-plt.savefig("ensemble_comparison.pdf")
+# 'tight' removes whitespace
+plt.savefig("ensemble_comparison.pdf",bbox_inches='tight')
 plt.show()
