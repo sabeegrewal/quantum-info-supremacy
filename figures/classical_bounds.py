@@ -3,6 +3,9 @@ from jax.lax import erf
 import jax.numpy as jnp
 import jaxopt
 
+import numpy as np
+import scipy.integrate as integrate
+
 # Seems to need 64-bit precision for numerical stability of erf
 jax.config.update('jax_enable_x64', True)
 
@@ -86,6 +89,17 @@ def classical_xeb_bound(a, m, n, ensemble):
         a, m, g, A, B, t_star
     )
 
+# Just compute the best a
+def optimum_a(m, n, ensemble):
+    def wrapped_bound(a):
+        return classical_xeb_bound(a, m, n, ensemble)
+    
+    solver = jaxopt.BFGS(fun=jax.value_and_grad(wrapped_bound), value_and_grad=True)
+    res = solver.run(init_params=1.5)
+    a, state = res
+    return a
+optimum_a_jit = jax.jit(optimum_a, static_argnums=[1, 2])
+
 # Minimize the bound over a
 def max_classical_xeb(m, n, ensemble):
     def wrapped_bound(a):
@@ -118,3 +132,15 @@ def min_communication(xeb, n, ensemble, tol=1e-6):
         else:
             hi = mid
     return mid
+
+# Achievable lower bound on XEB
+def achievable_classical_xeb(m, n):
+    N = 2**n
+    M = 2**m
+
+    def integrand(u):
+        return np.exp(-M * u**(N - 1))
+
+    integral = integrate.quad(integrand, 0, 1)[0]
+    H_N_minus_1 = sum(1 / i for i in range(2, N+1))
+    return H_N_minus_1 * (1 - N * integral / (N - 1))
