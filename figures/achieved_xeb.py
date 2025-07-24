@@ -35,5 +35,6 @@ plt.annotate("$m$ = 61.4", xy=(61.37, mu - 5 * sigma), xytext=(61.37, mu - 5*sig
 
 plt.legend()
 
-plt.savefig("achieved_xeb.pdf")
+# 'tight' removes whitespace
+plt.savefig("achieved_xeb.pdf", bbox_inches='tight')
 plt.show()
