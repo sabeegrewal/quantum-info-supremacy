@@ -6,12 +6,29 @@ import matplotlib.pyplot as plt
 
 # Plot the n=12 bound along with the XEB observed in experiment
 
-myrange = np.arange(0, 250, 1)
+# First compute mu and mu - 5*sigma
 
-# mu at ~77.29 bits
-# mu - 5 sigma at ~61.37 bits
-mu = 0.4267625296473500
-sigma = 1.3058928853745300 / np.sqrt(10000)
+filename = "../data/shots_H1-1_12_86_Thu_Jun_12_17-06-28_2025.csv"
+xeb_list = []
+n_shots = 10000
+with open(filename, "r") as file:
+    # First line is a header
+    file.readline()
+    for i in range(n_shots):
+        xeb = float(file.readline().strip().split(",")[-1])
+        xeb_list.append(xeb)
+
+# mu at ~77.36 bits
+# mu - 5 sigma at ~61.42 bits
+mu = np.average(xeb_list)
+print(f"mu: {mu}")
+sigma = np.std(xeb_list) / np.sqrt(n_shots)
+print(f"sigma: {sigma}")
+
+mu_comm = min_communication(mu, 12, "cliff")
+mu_5sigma_comm = min_communication(mu - 5*sigma, 12, "cliff")
+
+myrange = np.arange(0, 250, 1)
 
 plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['font.size'] = 12
@@ -19,19 +36,19 @@ plt.rcParams['font.size'] = 12
 xebs = [max_classical_xeb_jit(x, 12, "cliff") for x in myrange]
 plt.plot(xebs, myrange, color="#30A08E", linewidth=2, label="Classical bound")
 plt.ylabel("Bits of classical communication, $m$")
-plt.xlabel("Maximum achievable $\mathcal{F}_{\mathrm{XEB}}$")
+plt.xlabel("Linear cross-entropy benchmarking fidelity, $\mathcal{F}_{\mathrm{XEB}}$")
 plt.ylim((0,250))
 plt.xlim((0,1))
 
-# 0.426762529
+# 0.427040981894732
 plt.vlines(mu, 0, 250, colors='#8064A2', linestyles='-.', linewidth=1.5, label=r"Observed $\mu$")
-# 0.361467885
+# 0.361714588004784
 plt.vlines(mu - 5 * sigma, 0, 250, colors='#E75D72', linestyles='--', linewidth=1.5, label=r"Observed $\mu - 5\sigma$")
 
-plt.annotate("$m$ = 77.3", xy=(mu, 77.29), xytext=(mu+0.15, 77.29),
-            arrowprops=dict(arrowstyle='->'), ha='center')
-plt.annotate("$m$ = 61.4", xy=(mu - 5 * sigma, 61.37), xytext=(mu - 5*sigma - 0.15, 61.37),
-            arrowprops=dict(arrowstyle='->'), ha='center')
+plt.annotate(f"$m$ = {mu_comm:.1f}", xy=(mu, mu_comm), xytext=(mu+0.15, mu_comm),
+            arrowprops=dict(arrowstyle='->'), ha='center', va='center')
+plt.annotate(f"$m$ = {mu_5sigma_comm:.1f}", xy=(mu - 5 * sigma, mu_5sigma_comm), xytext=(mu - 5*sigma - 0.15, mu_5sigma_comm),
+            arrowprops=dict(arrowstyle='->'), ha='center', va='center')
 
 plt.legend()
 
