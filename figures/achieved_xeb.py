@@ -41,9 +41,9 @@ plt.ylim((0,250))
 plt.xlim((0,1))
 
 # 0.427040981894732
-plt.vlines(mu, 0, 250, colors='#8064A2', linestyles='-.', linewidth=1.5, label=r"Observed $\mu$")
+plt.vlines(mu, 0, 250, colors='#8064A2', linestyles='-.', linewidth=1.5, label=r"Observed $\mathcal{F}_{\mathrm{XEB}}$")
 # 0.361714588004784
-plt.vlines(mu - 5 * sigma, 0, 250, colors='#E75D72', linestyles='--', linewidth=1.5, label=r"Observed $\mu - 5\sigma$")
+plt.vlines(mu - 5 * sigma, 0, 250, colors='#E75D72', linestyles='--', linewidth=1.5, label=r"Observed $\mathcal{F}_{\mathrm{XEB}} - 5\sigma$")
 
 plt.annotate(f"$m$ = {mu_comm:.1f}", xy=(mu, mu_comm), xytext=(mu+0.15, mu_comm),
             arrowprops=dict(arrowstyle='->'), ha='center', va='center')
