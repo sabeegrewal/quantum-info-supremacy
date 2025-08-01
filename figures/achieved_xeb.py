@@ -36,7 +36,7 @@ plt.rcParams['font.size'] = 12
 xebs = [max_classical_xeb_jit(x, 12, "cliff") for x in myrange]
 plt.plot(xebs, myrange, color="#30A08E", linewidth=2, label="Classical bound")
 plt.ylabel("Bits of classical communication, $m$")
-plt.xlabel("Bound on $\mathcal{F}_{\mathsf{XEB}}, \epsilon$")
+plt.xlabel("Linear cross-entropy benchmarking fidelity, $\mathcal{F}_{\mathsf{XEB}}$")
 plt.ylim((0,250))
 plt.xlim((0,1))
 
