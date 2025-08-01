@@ -36,14 +36,14 @@ plt.rcParams['font.size'] = 12
 xebs = [max_classical_xeb_jit(x, 12, "cliff") for x in myrange]
 plt.plot(xebs, myrange, color="#30A08E", linewidth=2, label="Classical bound")
 plt.ylabel("Bits of classical communication, $m$")
-plt.xlabel("Linear cross-entropy benchmarking fidelity, $\mathcal{F}_{\mathrm{XEB}}$")
+plt.xlabel("Bound on $\mathcal{F}_{\mathsf{XEB}}, \epsilon$")
 plt.ylim((0,250))
 plt.xlim((0,1))
 
 # 0.427040981894732
-plt.vlines(mu, 0, 250, colors='#8064A2', linestyles='-.', linewidth=1.5, label=r"Observed $\mathcal{F}_{\mathrm{XEB}}$")
+plt.vlines(mu, 0, 250, colors='#8064A2', linestyles='-.', linewidth=1.5, label=r"$\widehat{\mathcal{F}}_{\mathsf{XEB}}$")
 # 0.361714588004784
-plt.vlines(mu - 5 * sigma, 0, 250, colors='#E75D72', linestyles='--', linewidth=1.5, label=r"Observed $\mathcal{F}_{\mathrm{XEB}} - 5\sigma$")
+plt.vlines(mu - 5 * sigma, 0, 250, colors='#E75D72', linestyles='--', linewidth=1.5, label=r"$\widehat{\mathcal{F}}_{\mathsf{XEB}} - 5\sigma$")
 
 plt.annotate(f"$m$ = {mu_comm:.1f}", xy=(mu, mu_comm), xytext=(mu+0.15, mu_comm),
             arrowprops=dict(arrowstyle='->'), ha='center', va='center')
