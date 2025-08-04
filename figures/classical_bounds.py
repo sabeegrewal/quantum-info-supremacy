@@ -144,3 +144,25 @@ def achievable_classical_xeb(m, n):
     integral = integrate.quad(integrand, 0, 1)[0]
     H_N_minus_1 = sum(1 / i for i in range(2, N+1))
     return H_N_minus_1 * (1 - N * integral / (N - 1))
+
+# Approximate inverse of the function above
+def max_communication(xeb, n, tol=1e-6):
+    # We could use gradient methods here, but this seems to be much faster and less buggy
+    # Perform an exponential search starting at one bit of communication
+    lo = 0.001
+    if xeb < achievable_classical_xeb(lo, n):
+        return None
+    # Try to find an upper bound
+    hi = 2.0
+    while xeb > achievable_classical_xeb(hi, n):
+        # I'm worried about the numerical stability of max_classical_xeb,
+        # so that's why we shouldn't increase the upper bound too quickly
+        hi *= 1.25
+    # Now binary search
+    while hi - lo > tol:
+        mid = (hi + lo) / 2
+        if xeb >= achievable_classical_xeb(mid, n):
+            lo = mid
+        else:
+            hi = mid
+    return mid
