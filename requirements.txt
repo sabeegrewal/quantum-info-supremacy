@@ -1,8 +1,6 @@
 numpy
 scipy
-pytest 
-quimb 
-matplotlib 
+matplotlib
 jax
 qujax
 pytket
