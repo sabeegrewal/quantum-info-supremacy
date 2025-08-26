@@ -6,3 +6,4 @@ qujax
 pytket
 pytket-quantinuum[pecos]
 pytket-qiskit
+qiskit
