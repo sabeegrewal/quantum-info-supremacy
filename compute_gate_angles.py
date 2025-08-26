@@ -41,18 +41,12 @@ print("Loaded")
 time_str = (
     time.asctime().replace("/", "_").replace(":", "-").replace(" ", "_")
 )
-filename = f"data/angles_{device_name}_{n}_{depth}_{time_str}.csv"
-with open(filename, "w") as file:
-    file.write("Seed,Index,Angle\n")
+filename = f"data/angles_{device_name}_{n}_{depth}_{time_str}.npy"
 
-    all_zz_params = []
-    for job_data in job_datas:
-        for seed, all_params in zip(job_data.seeds, job_data.opt_param_lists):
-            zz_params = zzphase_params(job_data.n, all_params)
-            all_zz_params.extend(zz_params)
-            for i in range(len(zz_params)):
-                file.write(f"{seed},{i},{zz_params[i]}\n")
+all_zz_params = []
+for job_data in job_datas:
+    for seed, all_params in zip(job_data.seeds, job_data.opt_param_lists):
+        zz_params = zzphase_params(job_data.n, all_params)
+        all_zz_params.extend(zz_params)
 
-from matplotlib import pyplot as plt
-plt.hist(all_zz_params)
-plt.show()
+np.save(filename, np.array(all_zz_params))
