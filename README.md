@@ -3,6 +3,8 @@
 This repository contains the code accompanying the paper  
 **“Demonstrating an unconditional separation between quantum and classical information resources.”**
 
+The data used for this project can be found in [quantum-info-supremacy-data](https://github.com/sabeegrewal/quantum-info-supremacy-data/).
+
 Install requirements:
 `pip install -r requirements.txt`
 
