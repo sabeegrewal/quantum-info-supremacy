@@ -31,9 +31,11 @@ Installation should complete within a few minutes.
 
 ## Demo 
 
-We provide a file `main-demo.py` that runs a single instance of our experiment on a local emulator. To try it out, follow these steps:
+We provide a file `main-demo.py` that runs a single instance of our experiment on a local emulator. The expected runtime of the demo is between 1.5 and 10 minutes, depending on your computer's processor. The demo has been tested on Python 3.12.3.
 
-1. **Clone this repository.**
+To try it out, follow these steps:
+
+1. **Clone this repository.** Follow the [installation instructions](#installation) to set up the environment. 
 
 2. **Download randomness data.**  
    Obtain [this file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/ANU_13Oct2017_100MB_1), which contains 100 MB of true randomness used to generate Alice’s input state and Bob’s Clifford measurement. Place the file in `./randomness/`.
