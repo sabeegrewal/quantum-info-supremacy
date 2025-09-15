@@ -67,7 +67,7 @@ if __name__ == "__main__":
     n = 12
     depth = 86
     noisy = True
-    device_name = "H1-1"
+    device_name = "H1-1LE" # Change to H1-1 for actual experiment
     detect_leakage = False
 
     submit_job = True
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     n_parallel = 8
     n_shots = 1
     start_seed = 0
-    n_seeds = 1600
+    n_seeds = 2 # Change to 10000 for actual experiment
 
     assert n_parallel % n_stitches == 0
 
