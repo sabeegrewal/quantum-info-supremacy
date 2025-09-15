@@ -39,7 +39,7 @@ To try it out, follow these steps:
    Follow the [installation instructions](#installation) to set up the environment. 
 
 3. **Download randomness data.**  
-   Obtain [this file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/ANU_13Oct2017_100MB_1), which contains 100 MB of true randomness used to generate Alice’s input state and Bob’s Clifford measurement. Place the file in `./randomness/`.
+   Obtain [this file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/ANU_13Oct2017_100MB_1), which contains 100 MB of true randomness used to generate Alice’s input state and Bob’s Clifford measurement. Place the file in `/randomness/`.
 
 4. **Check settings in `main.py`.**
    In `main.py`, ensure that lines 67–78 match the following:
@@ -87,5 +87,5 @@ The code used to generate the figures in our manuscript is located in the `/figu
 - The remaining scripts require external data files available in the companion repository [quantum-info-supremacy-data](https://github.com/sabeegrewal/quantum-info-supremacy-data/).  
 
 In particular:  
-- To run `achieved_xeb.py`, first download [this CSV file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/data/shots_H1-1_12_86_Thu_Jun_12_17-06-28_2025.csv).  
-- To run `angle_distribution.py`, first download [this NumPy file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/data/angles_H1-1_12_86_Tue_Aug_26_12-56-25_2025.npy).  
+- To run `achieved_xeb.py`, first download [this CSV file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/data/shots_H1-1_12_86_Thu_Jun_12_17-06-28_2025.csv) and place it in the `/data/` directory.
+- To run `angle_distribution.py`, first download [this NumPy file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/data/angles_H1-1_12_86_Tue_Aug_26_12-56-25_2025.npy) and place it in the `/data/` directory.
