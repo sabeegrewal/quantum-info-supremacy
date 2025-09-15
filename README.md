@@ -5,9 +5,6 @@ This repository contains the code accompanying the paper
 
 The data used for this project can be found in [quantum-info-supremacy-data](https://github.com/sabeegrewal/quantum-info-supremacy-data/).
 
-Install requirements:
-`pip install -r requirements.txt`
-
 ## Project Organization
 
 ------------
@@ -21,3 +18,52 @@ Install requirements:
                          random Clifford measurement. (iv) Executes the circuit and records the results.
 ------------
 
+## Installation
+
+This project requires **Python 3**. To install the necessary dependencies, run:
+
+```bash
+pip install -r requirements.txt
+```
+
+Installation should complete within a few minutes.
+
+
+## Demo 
+
+We provide a file `main-demo.py` that runs a single instance of our experiment on a local emulator. To try it out, follow these steps:
+
+1. **Clone this repository.**
+
+2. **Download randomness data.**  
+   Obtain [this file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/ANU_13Oct2017_100MB_1), which contains 100 MB of true randomness used to generate Alice’s input state and Bob’s Clifford measurement. Place the file in `./randomness/`.
+
+3. **Run the demo.**  
+   Execute:
+   ```bash
+   python main-demo.py
+   ```
+
+This script will:
+
+* Load the randomness from Step 2 and use it to generate Alice’s state and Bob’s measurement.
+
+* Train a parameterized circuit to approximate Alice’s Haar-random state using variational optimization.
+
+* Construct the overall circuit by combining Alice’s state preparation with Bob’s measurement.
+
+* Run the resulting circuit on Quantinuum’s local emulator.
+
+* Compute and display the XEB (cross-entropy benchmarking) score from the emulator output.
+
+The demo is a lightweight illustration of our full protocol. It does not require access to Quantinuum hardware, but faithfully reproduces the logic of the experiment. For those interested in larger-scale reproductions, all of the true randomness used in our experiments is available [here](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/).
+
+## Generating Figures
+
+The code used to generate the figures in our manuscript is located in the `/figures/` directory.  
+- The scripts `classical_bounds.py`, `ensemble_comparison.py`, and `noiseless_bound.py` can be run as standalone programs, provided the dependencies in `requirements.txt` have been installed.  
+- The remaining scripts require external data files available in the companion repository [quantum-info-supremacy-data](https://github.com/sabeegrewal/quantum-info-supremacy-data/).  
+
+In particular:  
+- To run `achieved_xeb.py`, first download [this CSV file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/data/shots_H1-1_12_86_Thu_Jun_12_17-06-28_2025.csv).  
+- To run `angle_distribution.py`, first download [this NumPy file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/data/angles_H1-1_12_86_Tue_Aug_26_12-56-25_2025.npy).  
