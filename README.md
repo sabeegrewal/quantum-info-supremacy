@@ -76,7 +76,7 @@ This script will:
 
 * Run the resulting circuit on Quantinuum’s local emulator, and compute the XEB scores from the two instances. 
 
-* Log the experimental data in the `/logs/` directory. The expected output of this demo can be found (here)[https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/logs/H1-1LE/n_12_depth_86/seeds_0-1_2025-09-15_13-18-51.txt].
+* Log the experimental data in the `/logs/` directory. The expected output of this demo can be found [here](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/logs/H1-1LE/n_12_depth_86/seeds_0-1_2025-09-15_13-18-51.txt).
 
 The demo is a lightweight illustration of our full protocol. It does not require access to Quantinuum hardware, but faithfully reproduces the logic of the experiment. For those interested in larger-scale reproductions, all of the true randomness used in our experiments is available [here](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/).
 
