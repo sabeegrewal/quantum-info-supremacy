@@ -31,7 +31,7 @@ Installation should complete within a few minutes.
 
 ## Demo 
 
-It is possible to run a single instance of our experiment on a local emulator. The expected runtime of the demo is between 1.5 and 10 minutes, depending on your computer's processor. The demo has been tested on Python 3.12.3.
+It is possible to run a toy example of our experiment on a local emulator. The expected runtime of the demo is between 1 and 10 minutes, depending on your computer's processor. This demo runs in around 80 seconds on a 2022 M2 Macbook Air. The demo has been tested on Python 3.12.3.
 
 To try it out, follow these steps:
 
@@ -72,9 +72,11 @@ This script will:
 
 * Construct the overall circuit by combining Alice’s state preparation with Bob’s measurement.
 
-* Run the resulting circuit on Quantinuum’s local emulator.
+* Repeat the above and stitch the circuits together into a single job (see [Circuit Stitching](https://docs.quantinuum.com/systems/trainings/knowledge_articles/circuit_stitching.html)).
 
-* Compute and display the XEB (cross-entropy benchmarking) score from the emulator output.
+* Run the resulting circuit on Quantinuum’s local emulator, and compute the XEB scores from the two instances. 
+
+* Log the experimental data in the `/logs/` directory. The expected output of this demo can be found (here)[https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/logs/H1-1LE/n_12_depth_86/seeds_0-1_2025-09-15_13-18-51.txt].
 
 The demo is a lightweight illustration of our full protocol. It does not require access to Quantinuum hardware, but faithfully reproduces the logic of the experiment. For those interested in larger-scale reproductions, all of the true randomness used in our experiments is available [here](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/).
 
