@@ -31,26 +31,44 @@ Installation should complete within a few minutes.
 
 ## Demo 
 
-We provide a file `main-demo.py` that runs a single instance of our experiment on a local emulator. The expected runtime of the demo is between 1.5 and 10 minutes, depending on your computer's processor. The demo has been tested on Python 3.12.3.
+It is possible to run a single instance of our experiment on a local emulator. The expected runtime of the demo is between 1.5 and 10 minutes, depending on your computer's processor. The demo has been tested on Python 3.12.3.
 
 To try it out, follow these steps:
 
-1. **Clone this repository.** Follow the [installation instructions](#installation) to set up the environment. 
+1. **Clone this repository.**
+   Follow the [installation instructions](#installation) to set up the environment. 
 
-2. **Download randomness data.**  
+3. **Download randomness data.**  
    Obtain [this file](https://github.com/sabeegrewal/quantum-info-supremacy-data/blob/main/randomness/ANU_13Oct2017_100MB_1), which contains 100 MB of true randomness used to generate Alice’s input state and Bob’s Clifford measurement. Place the file in `./randomness/`.
 
-3. **Run the demo.**  
+4. **Check settings in `main.py`.**
+   In `main.py`, ensure that lines 67–78 match the following:
+   ```python
+    n = 12
+    depth = 86
+    noisy = True
+    device_name = "H1-1LE" # Change to H1-1 for actual experiment
+    detect_leakage = False
+
+    submit_job = True
+    n_stitches = 2
+    n_parallel = 8
+    n_shots = 1
+    start_seed = 0
+    n_seeds = 2 # Change to 10000 for actual experiment
+    ```
+
+6. **Run the demo.**  
    Execute:
    ```bash
-   python main-demo.py
+   python main.py
    ```
 
 This script will:
 
 * Load the randomness from Step 2 and use it to generate Alice’s state and Bob’s measurement.
 
-* Train a parameterized circuit to approximate Alice’s Haar-random state using variational optimization.
+* Train a parameterized circuit to approximate Alice’s Haar-random state using variational optimization. This step can take between 1 and 10 minutes to complete. 
 
 * Construct the overall circuit by combining Alice’s state preparation with Bob’s measurement.
 
