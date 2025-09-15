@@ -6,6 +6,7 @@ from utils import rand
 from utils.job_data import JobData
 from utils.circuit import apply_clifford, make_clifford_circuit, stitch_circuits
 from utils.random_stabilizer import random_stabilizer_toggles_ag
+from utils.process_io import get_shots_and_xeb_scores
 
 
 from pytket.extensions.quantinuum import QuantinuumBackend, QuantinuumAPIOffline
@@ -218,7 +219,15 @@ if __name__ == "__main__":
 
             if submit_job:
                 if device_name == "H1-1LE":
-                    result = backend.run_circuit(overall_circ, n_shots=n_shots)
+                    result = backend.run_circuit(overall_circ, n_shots=n_shots, seed=0)
+                    logging.info("Local emulator results:")
+                    logging.info("Seed, Shot, XEB Score")
+                    shots_and_scores_by_seed = get_shots_and_xeb_scores(scoring_states, detect_leakage, result)
+                    for circ_idx in range(len(batch)):
+                        seed = batch[circ_idx]
+                        shots_and_scores = shots_and_scores_by_seed[circ_idx]
+                        for shot, score in shots_and_scores:
+                            logging.info(f"{seed}, {shot}, {score}")
                 else:
                     result_handle = backend.process_circuit(
                         overall_circ, n_shots=n_shots
